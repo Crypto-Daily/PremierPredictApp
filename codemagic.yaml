@@ -22,9 +22,10 @@ workflows:
             cd PremierPredict
           fi
 
-      - name: Force APK build
+      - name: Build APK
         script: |
           cordova build android --release -- --packageType=apk
+          ls -la platforms/android/app/build/outputs/apk/release/
 
     artifacts:
-      - PremierPredict/platforms/android/app/build/outputs/apk/**/*.apk
+      - PremierPredict/platforms/android/app/build/outputs/apk/release/*.apk
