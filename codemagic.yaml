@@ -9,10 +9,20 @@ workflows:
         script: |
           npm install -g cordova
           npm ci || npm install || true
+      - name: Create Cordova project if missing
+        script: |
+          if [ ! -d "www" ]; then
+            mkdir www
+            echo "<html><body><h2>PremierPredict</h2><script>window.location.href='https://premierpredict.xyz';</script></body></html>" > www/index.html
+          fi
+          cordova create PremierPredict com.premierpredict.app PremierPredictApp || true
+          cd PremierPredict
+          cordova platform add android --nofetch || true
+          cp -r ../www .
       - name: Build APK
         script: |
-          cordova platform add android --nofetch || true
+          cd PremierPredict
           cordova build android --release
     artifacts:
-      - platforms/android/app/build/outputs/**/*.apk
-      - platforms/android/app/build/outputs/**/*.aab
+      - PremierPredict/platforms/android/app/build/outputs/**/*.apk
+      - PremierPredict/platforms/android/app/build/outputs/**/*.aab
