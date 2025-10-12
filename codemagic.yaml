@@ -12,21 +12,19 @@ workflows:
 
       - name: Create Cordova project if missing
         script: |
-          if [ ! -d "www" ]; then
+          if [ ! -d "PremierPredict" ]; then
+            cordova create PremierPredict com.premierpredict.app PremierPredictApp
+            cd PremierPredict
+            cordova platform add android
             mkdir www
             echo "<html><body><h2>PremierPredict</h2><script>window.location.href='https://premierpredict.xyz';</script></body></html>" > www/index.html
+          else
+            cd PremierPredict
           fi
-          cordova create PremierPredict com.premierpredict.app PremierPredictApp || true
-          cd PremierPredict
-          cordova platform add android --nofetch || true
-          cp -r ../www .
 
-      - name: Build APK and AAB
+      - name: Force APK build
         script: |
-          cd PremierPredict
           cordova build android --release -- --packageType=apk
-          cordova build android --release -- --packageType=bundle
 
     artifacts:
-      - PremierPredict/platforms/android/app/build/outputs/**/*.apk
-      - PremierPredict/platforms/android/app/build/outputs/**/*.aab
+      - PremierPredict/platforms/android/app/build/outputs/apk/**/*.apk
