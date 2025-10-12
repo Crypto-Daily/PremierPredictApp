@@ -2,13 +2,14 @@ workflows:
   Build WebView APK:
     name: Build WebView APK
     environment:
-      node: 18.16.0
+      node: 20.5.1
       java: 17
     scripts:
       - name: Install Cordova and dependencies
         script: |
           npm install -g cordova
           npm ci || npm install || true
+
       - name: Create Cordova project if missing
         script: |
           if [ ! -d "www" ]; then
@@ -19,10 +20,12 @@ workflows:
           cd PremierPredict
           cordova platform add android --nofetch || true
           cp -r ../www .
+          
       - name: Build APK
         script: |
           cd PremierPredict
           cordova build android --release
+
     artifacts:
-      - PremierPredict/platforms/android/app/build/outputs/**/*.apk
-      - PremierPredict/platforms/android/app/build/outputs/**/*.aab
+      - platforms/android/app/build/outputs/**/*.apk
+      - platforms/android/app/build/outputs/**/*.aab
