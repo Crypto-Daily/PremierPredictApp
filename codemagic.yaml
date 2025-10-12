@@ -1,0 +1,17 @@
+workflows:
+  build_apk:
+    name: Build WebView APK
+    environment:
+      node: 18.16.0
+      java: 17
+    scripts:
+      - name: Install Cordova and dependencies
+        script: |
+          npm install -g cordova
+          npm ci || npm install || true
+      - name: Build APK
+        script: |
+          cordova platform add android --nofetch || true
+          cordova build android --release
+    artifacts:
+      - platforms/android/app/build/outputs/**/*.apk
