@@ -1,5 +1,5 @@
 workflows:
-  Build WebView APK:
+  build_webview_apk:
     name: Build WebView APK
     environment:
       node: 20.5.1
@@ -20,12 +20,13 @@ workflows:
           cd PremierPredict
           cordova platform add android --nofetch || true
           cp -r ../www .
-          
-      - name: Build APK
+
+      - name: Build APK and AAB
         script: |
           cd PremierPredict
-          cordova build android --release
+          cordova build android --release -- --packageType=apk
+          cordova build android --release -- --packageType=bundle
 
     artifacts:
-      - platforms/android/app/build/outputs/**/*.apk
-      - platforms/android/app/build/outputs/**/*.aab
+      - PremierPredict/platforms/android/app/build/outputs/**/*.apk
+      - PremierPredict/platforms/android/app/build/outputs/**/*.aab
