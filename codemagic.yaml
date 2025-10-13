@@ -10,22 +10,21 @@ workflows:
           npm install -g cordova
           npm ci || npm install || true
 
-      - name: Create Cordova project if missing
+      - name: Prepare Cordova project
         script: |
-          if [ ! -d "PremierPredict" ]; then
-            cordova create PremierPredict com.premierpredict.app PremierPredictApp
-            cd PremierPredict
-            cordova platform add android
+          if [ ! -d "www" ]; then
             mkdir www
-            echo "<html><body><h2>PremierPredict</h2><script>window.location.href='https://premierpredict.xyz';</script></body></html>" > www/index.html
-          else
-            cd PremierPredict
+            echo "<html><body><iframe src='https://crypto-daily.github.io/PremierPredict-/' style='border:0;width:100%;height:100vh;'></iframe></body></html>" > www/index.html
           fi
+          cordova create PremierPredict com.premierpredict.app PremierPredictApp || true
+          cd PremierPredict
+          cordova platform add android --nofetch || true
+          cp -r ../www .
 
-      - name: Build APK
+      - name: Build APK (Debug)
         script: |
-          cordova build android --release -- --packageType=apk
-          ls -la platforms/android/app/build/outputs/apk/release/
+          cd PremierPredict
+          cordova build android --debug
 
     artifacts:
-      - PremierPredict/platforms/android/app/build/outputs/apk/release/*.apk
+      - PremierPredict/platforms/android/app/build/outputs/**/*.apk
