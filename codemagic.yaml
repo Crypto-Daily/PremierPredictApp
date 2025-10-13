@@ -1,6 +1,6 @@
 workflows:
-  build_webview_apk:
-    name: Build WebView APK
+  build_webview_zip:
+    name: Build WebView ZIP
     environment:
       node: 20.5.1
       java: 17
@@ -21,11 +21,9 @@ workflows:
           cordova platform add android --nofetch || true
           cp -r ../www/* www/
 
-      - name: Build APK (Debug)
+      - name: Zip project for manual APK build
         script: |
-          cd PremierPredict
-          cordova build android --debug
-          cd ..
+          zip -r PremierPredict.zip PremierPredict
 
     artifacts:
-      - "PremierPredict/platforms/android/app/build/outputs/apk/debug/*.apk"
+      - "PremierPredict.zip"
