@@ -10,12 +10,12 @@ const MEMORY_PATTERN = /\bremember that\b/i;
 
 const CREATION_PATTERN = /^(please\s+|can you\s+|could you\s+)?(create|make|design|build)\b(?!\s+(sure|sense|it|a case|an argument))/i;
 
-const DEVICE_CONTROL_PATTERN = /\b(turn (on|off)|switch (on|off))\s+(the\s+)?\w+/i;
+const DEVICE_CONTROL_PATTERN = /\b(turn (on|off)|switch (on|off))\s+(the\s+)?\w+/i;\nconst SELF_UPGRADE_PATTERN = /\b(upgrade yourself|modify your own code|change your own code|rewrite your code|improve your architecture|fix your source code|update your own files)\b/i;
 
 function routeIntent(command) {
   const text = command.trim();
 
-  if (SELF_INSPECT_PATTERN.test(text)) {
+  if (SELF_UPGRADE_PATTERN.test(text)) return 'SELF_UPGRADE';\n\n  if (SELF_INSPECT_PATTERN.test(text)) {
     return 'SELF_INSPECT';
   }
 
