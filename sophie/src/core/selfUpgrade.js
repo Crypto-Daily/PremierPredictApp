@@ -69,7 +69,7 @@ function syntaxCheck(absolutePath) {
   } catch (error) {
     return {
       ok: false,
-      error: '${{error.stdout || ''}${{error.stderr || ''}'.trim() || error.message
+      error: `${error.stdout || ''}${error.stderr || ''}`.trim() || error.message
     };
   }
 }
@@ -300,7 +300,7 @@ async function rollbackAndRestart(backup) {
     restoreBackup(backup);
     result.restored = true;
   } catch (error) {
-    result.error = 'Rollback restore failed: ${{error.message}';
+    result.error = `Rollback restore failed: ${error.message}`;
     return result;
   }
 
