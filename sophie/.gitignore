@@ -1,0 +1,10 @@
+.env
+.env.*
+node_modules/
+backups/
+data/
+*.backup
+*.before-*
+*.bak
+npm-debug.log*
+.DS_Store
