@@ -422,5 +422,6 @@ module.exports = {
   healthCheck,
   gitStatus,
   gitCheckpoint,
+  restartSophie,
   applyUpgrade
 };
