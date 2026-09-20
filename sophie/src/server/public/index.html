@@ -877,6 +877,12 @@
       <input type="range" id="rateSlider" min="0.7" max="1.4" step="0.1">
     </div>
 
+    <div class="settings-group">
+      <div class="settings-label">Developer access</div>
+      <div class="settings-label" id="upgradeModeStatus">Upgrade Mode is locked.</div>
+      <button class="choice-btn" id="upgradeModeBtn">Enable Upgrade Mode</button>
+    </div>
+
     <button id="closeSettings">Close</button>
   </div>
 </div>
@@ -917,6 +923,8 @@ const filePreview = document.getElementById('filePreview');
 const fileChipName = document.getElementById('fileChipName');
 const removeFilePreview = document.getElementById('removeFilePreview');
 const settingsBtn = document.getElementById('settingsBtn');
+const upgradeModeBtn = document.getElementById('upgradeModeBtn');
+const upgradeModeStatus = document.getElementById('upgradeModeStatus');
 const settingsOverlay = document.getElementById('settingsOverlay');
 const closeSettings = document.getElementById('closeSettings');
 const swatchRow = document.getElementById('swatchRow');
@@ -951,7 +959,7 @@ function closeModal() {
   modalOverlay.classList.remove('open');
 }
 
-function showModal({ title, message, inputDefault, isConfirm, confirmLabel, cancelLabel, danger }) {
+function showModal({ title, message, inputDefault, inputType = 'text', isConfirm, confirmLabel, cancelLabel, danger }) {
   return new Promise(resolve => {
     modalTitle.textContent = title;
     modalBody.innerHTML = '';
@@ -965,7 +973,7 @@ function showModal({ title, message, inputDefault, isConfirm, confirmLabel, canc
       modalBody.appendChild(p);
     } else {
       inputEl = document.createElement('input');
-      inputEl.type = 'text';
+      inputEl.type = inputType;
       inputEl.className = 'modal-input';
       inputEl.value = inputDefault || '';
       modalBody.appendChild(inputEl);
@@ -1138,6 +1146,53 @@ settingsOverlay.addEventListener('click', e => {
 });
 
 applyPrefs();
+
+async function refreshUpgradeMode() {
+  try {
+    const response = await fetch('/api/self-upgrade/session', { cache: 'no-store' });
+    const data = await response.json();
+    const active = response.ok && data.authorized === true;
+    upgradeModeStatus.textContent = active ? 'Upgrade Mode is unlocked for 30 minutes.' : 'Upgrade Mode is locked.';
+    upgradeModeBtn.textContent = active ? 'Lock Upgrade Mode' : 'Enable Upgrade Mode';
+    upgradeModeBtn.classList.toggle('selected', active);
+  } catch {
+    upgradeModeStatus.textContent = 'Upgrade Mode status unavailable.';
+  }
+}
+
+upgradeModeBtn.addEventListener('click', async () => {
+  const active = upgradeModeBtn.classList.contains('selected');
+
+  if (active) {
+    await fetch('/api/self-upgrade/session', { method: 'DELETE' });
+    await refreshUpgradeMode();
+    return;
+  }
+
+  const passcode = await showModal({
+    title: 'Enable Upgrade Mode',
+    message: 'Enter your admin passcode. It is sent directly to the protected upgrade-session endpoint and is never added to chat.',
+    inputType: 'password',
+    confirmLabel: 'Unlock'
+  });
+
+  if (!passcode) return;
+
+  try {
+    const response = await fetch('/api/self-upgrade/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passcode })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not enable Upgrade Mode');
+    await refreshUpgradeMode();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+refreshUpgradeMode();
 
 function openSidebar() { sidebar.classList.add('open'); overlay.classList.add('open'); }
 function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
