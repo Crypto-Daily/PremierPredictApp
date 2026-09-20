@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
 
 const identity = require('../core/identity');
 const ModuleManager = require('../core/moduleManager');
@@ -19,6 +20,41 @@ const {
 } = require('../core/selfUpgrade');
 
 const app = express();
+app.set('trust proxy', 1);
+
+const upgradeSessions = new Map();
+const UPGRADE_SESSION_TTL = 30 * 60 * 1000;
+
+function cleanupUpgradeSessions() {
+  const now = Date.now();
+  for (const [token, expiresAt] of upgradeSessions) {
+    if (expiresAt <= now) upgradeSessions.delete(token);
+  }
+}
+
+function getCookie(req, name) {
+  const header = req.headers.cookie || '';
+  const parts = header.split(';').map(part => part.trim());
+  const prefix = name + '=';
+  const found = parts.find(part => part.startsWith(prefix));
+  return found ? decodeURIComponent(found.slice(prefix.length)) : null;
+}
+
+function hasUpgradeSession(req) {
+  cleanupUpgradeSessions();
+  const token = getCookie(req, 'sophie_upgrade');
+  if (!token) return false;
+  const expiresAt = upgradeSessions.get(token);
+  if (!expiresAt || expiresAt <= Date.now()) {
+    upgradeSessions.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function clearUpgradeCookie(res) {
+  res.setHeader('Set-Cookie', 'sophie_upgrade=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict' + ((process.env.NODE_ENV === 'production') ? '; Secure' : ''));
+}
 
 /*
  * --------------------------------------------------
@@ -180,6 +216,8 @@ app.post('/api/command', async (req, res) => {
     const { command } =
       req.body;
 
+    const upgradeAuthorized = hasUpgradeSession(req);
+
     if (
       typeof command !== 'string'
     ) {
@@ -197,12 +235,25 @@ app.post('/api/command', async (req, res) => {
 
     const result =
       await commandProcessor.process(
-        command
+        command,
+        { upgradeAuthorized }
       );
 
     console.log(
       '[COMMAND] Response ready'
     );
+
+    if (result && result.restartAfterResponse) {
+      setTimeout(() => {
+        try {
+          const { restartSophie } = require('../core/selfUpgrade');
+          const restartResult = restartSophie();
+          console.log('[SELF-UPGRADE] Restart after chat response:', restartResult);
+        } catch (error) {
+          console.error('[SELF-UPGRADE] Deferred restart failed:', error);
+        }
+      }, 1500);
+    }
 
     if (!res.headersSent) {
 
@@ -334,6 +385,52 @@ app.post('/api/vision', async (req, res) => {
  * upgrade planner. It does NOT execute arbitrary shell
  * commands supplied by the AI.
  */
+
+app.post('/api/self-upgrade/session', (req, res) => {
+  try {
+    const { passcode } = req.body;
+    const realPasscode = process.env.SOPHIE_ADMIN_PASSCODE;
+
+    if (!realPasscode || !passcode || passcode !== realPasscode) {
+      return res.status(401).json({ error: 'Incorrect passcode' });
+    }
+
+    cleanupUpgradeSessions();
+    const token = crypto.randomBytes(32).toString('hex');
+    upgradeSessions.set(token, Date.now() + UPGRADE_SESSION_TTL);
+
+    const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    const cookie = [
+      'sophie_upgrade=' + encodeURIComponent(token),
+      'Max-Age=' + Math.floor(UPGRADE_SESSION_TTL / 1000),
+      'Path=/',
+      'HttpOnly',
+      'SameSite=Strict'
+    ];
+    if (secure) cookie.push('Secure');
+
+    res.setHeader('Set-Cookie', cookie.join('; '));
+    res.json({ ok: true, expiresIn: UPGRADE_SESSION_TTL });
+  } catch (error) {
+    console.error('[SELF-UPGRADE SESSION] ERROR:', error);
+    res.status(500).json({ error: 'Could not start upgrade mode' });
+  }
+});
+
+app.delete('/api/self-upgrade/session', (req, res) => {
+  try {
+    const token = getCookie(req, 'sophie_upgrade');
+    if (token) upgradeSessions.delete(token);
+    clearUpgradeCookie(res);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Could not end upgrade mode' });
+  }
+});
+
+app.get('/api/self-upgrade/session', (req, res) => {
+  res.json({ authorized: hasUpgradeSession(req) });
+});
 
 app.get('/api/self-upgrade/status', (req, res) => {
   try {
