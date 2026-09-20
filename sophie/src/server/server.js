@@ -10,6 +10,7 @@ const Memory = require('../memory/memory');
 const CommandProcessor = require('../commands/commandProcessor');
 const { analyzeImage } = require('../ai/vision');
 const { writeProjectFile } = require('../core/selfWrite');
+const { planUpgrade, planAndApplyUpgrade } = require('../core/selfUpgradePlanner');
 const {
   applyUpgrade,
   validateProject,
@@ -345,6 +346,35 @@ app.get('/api/self-upgrade/status', (req, res) => {
     res.status(500).json({
       error: error.message
     });
+  }
+});
+
+app.post('/api/self-upgrade/plan', async (req, res) => {
+  try {
+    const { passcode, command } = req.body;
+    if (!passcode || !command) return res.status(400).json({ error: 'passcode and command are required' });
+    if (!process.env.SOPHIE_ADMIN_PASSCODE || passcode !== process.env.SOPHIE_ADMIN_PASSCODE) {
+      return res.status(401).json({ error: 'Incorrect passcode' });
+    }
+    res.json(await planUpgrade(command));
+  } catch (error) {
+    console.error('[SELF-UPGRADE PLAN] ERROR:', error);
+    res.status(422).json({ error: error.message });
+  }
+});
+
+app.post('/api/self-upgrade/chat', async (req, res) => {
+  try {
+    const { passcode, command, checkpoint = true, restart = true, checkpointMessage } = req.body;
+    if (!passcode || !command) return res.status(400).json({ error: 'passcode and command are required' });
+    if (!process.env.SOPHIE_ADMIN_PASSCODE || passcode !== process.env.SOPHIE_ADMIN_PASSCODE) {
+      return res.status(401).json({ error: 'Incorrect passcode' });
+    }
+    const result = await planAndApplyUpgrade({ command, checkpoint, restart, checkpointMessage });
+    res.status(result.ok ? 200 : 422).json(result);
+  } catch (error) {
+    console.error('[SELF-UPGRADE CHAT] ERROR:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
