@@ -4,6 +4,7 @@ const { buildSophiePrompt } = require('../ai/prompt');
 const { getCurrentTimeContext } = require('../core/time');
 const { performWebResearch } = require('../research/webSearch');
 const { fetchAndSummarizeUrl } = require('../research/urlFetch');
+const { planAndApplyUpgrade } = require('../core/selfUpgradePlanner');
 const {
   listProjectFiles,
   readProjectFile,
@@ -74,8 +75,9 @@ class CommandProcessor {
     this.memory = memory;
   }
 
-  async process(input) {
+  async process(input, options = {}) {
     const command = input.trim();
+    const upgradeAuthorized = options.upgradeAuthorized === true;
 
     if (!command) {
       return { type: 'response', text: 'I am listening.' };
@@ -206,6 +208,38 @@ class CommandProcessor {
 
     console.log(`[INTENT] ${intent}`);
 
+    if (intent === 'SELF_UPGRADE') {
+      if (!upgradeAuthorized) {
+        const text = 'Self-upgrade is locked. Open Settings → Upgrade Mode and authenticate first. I will not accept an admin passcode through normal chat.';
+        this.memory.addMessage('assistant', text);
+        return { type: 'response', text, upgradeLocked: true };
+      }
+
+      try {
+        const result = await planAndApplyUpgrade({
+          command,
+          checkpoint: true,
+          restart: false,
+          checkpointMessage: 'Sophie natural-language self-upgrade'
+        });
+
+        if (!result.ok) {
+          const text = `I could not safely apply that upgrade. Stage: ${result.stage || 'unknown'}.`;
+          this.memory.addMessage('assistant', text);
+          return { type: 'response', text, upgrade: result };
+        }
+
+        const changed = Array.isArray(result.changed) ? result.changed.join(', ') : 'the requested files';
+        const text = `Upgrade applied successfully. I changed: ${changed}. My code passed validation and a checkpoint was created. I will restart after this response.`;
+        this.memory.addMessage('assistant', text);
+        return { type: 'response', text, upgrade: result, restartAfterResponse: true };
+      } catch (error) {
+        console.error('[SELF-UPGRADE CHAT] ERROR:', error);
+        const text = `I could not complete that self-upgrade safely: ${error.message}`;
+        this.memory.addMessage('assistant', text);
+        return { type: 'response', text, upgradeError: true };
+      }
+    }
     if (intent === 'SELF_INSPECT') {
       let text;
 
