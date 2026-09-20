@@ -1,4 +1,4 @@
-const { askWithFallback } = require('./providerRouter');
+const { askWithFallback } = require('../ai/providerRouter');
 const { listProjectFiles, readProjectFile } = require('../core/selfInspect');
 const { applyUpgrade } = require('../core/selfUpgrade');
 
