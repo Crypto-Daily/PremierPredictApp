@@ -153,6 +153,46 @@ const MODULE_MAP = {
   'self inspection': 'src/core/selfInspect.js'
 };
 
+function findByName(query) {
+  const needle = String(query || '').trim().toLowerCase();
+
+  if (!needle) return [];
+
+  const matches = [];
+
+  function walk(dir) {
+    let entries;
+
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (isIgnoredForListing(entry.name)) continue;
+
+      const fullPath = path.join(dir, entry.name);
+      const relativePath = path.relative(PROJECT_ROOT, fullPath);
+
+      if (entry.name.toLowerCase().includes(needle)) {
+        matches.push({
+          path: relativePath,
+          type: entry.isDirectory() ? 'directory' : 'file'
+        });
+      }
+
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      }
+    }
+  }
+
+  walk(SOPHIE_SRC_ROOT);
+
+  return matches.slice(0, 100);
+}
+
 function resolveModuleQuery(query) {
   const text = query.toLowerCase();
 
@@ -170,5 +210,6 @@ module.exports = {
   readProjectFile,
   resolveModuleQuery,
   listDirectory,
-  readAnyFile
+  readAnyFile,
+  findByName
 };

@@ -1,10 +1,10 @@
 .env
 .env.*
 node_modules/
-backups/
 data/
-*.backup
+backups/
+logs/
+workspace/
 *.before-*
+*.backup
 *.bak
-npm-debug.log*
-.DS_Store
