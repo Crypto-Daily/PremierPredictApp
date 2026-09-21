@@ -37,7 +37,7 @@ LINKS
 WHAT I CANNOT DO YET
 - Generate PDF/DOCX/ZIP files, create download links, or run arbitrary shell commands. If I ever claim to have done one of these, that's a bug — tell me.
 
-Writing/editing my own files needs a passcode and goes through a direct API call, never through chat — passcodes typed in chat are blocked and never saved.`;
+Writing/editing my own files is protected by Upgrade Mode. Authenticate in Settings → Upgrade Mode first, then describe the change normally in chat. Passcodes typed in chat are blocked and never saved.`;
 
 const PATH_ALIASES = {
   'the server': null,
@@ -93,7 +93,7 @@ class CommandProcessor {
       console.warn('[SECURITY] A message containing the admin passcode was blocked before storage.');
 
       const text =
-        "That message looks like it contains your admin passcode. I never store or forward passcodes through chat, so I'm not saving this message and it was never sent to any AI provider. Writing/editing files needs the passcode sent directly to the /api/write-file endpoint, not typed here.";
+        "That message looks like it contains your admin passcode. I never store or forward passcodes through chat, so I'm not saving this message and it was never sent to any AI provider. To edit my own code, use Settings → Upgrade Mode and authenticate there first.";
 
       return { type: 'response', text };
     }
