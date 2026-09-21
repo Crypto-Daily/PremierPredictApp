@@ -190,7 +190,7 @@ function gitStatus() {
   try {
     return run('git', ['status', '--short'], { timeout: 15000 });
   } catch (error) {
-    return 'git status unavailable: ${{error.message}';
+    return `git status unavailable: ${error.message}`;
   }
 }
 
@@ -220,7 +220,7 @@ function gitCheckpoint(message = 'Sophie self-upgrade checkpoint', changedPaths 
   } catch (error) {
     return {
       ok: false,
-      error: '${{error.stdout || ''}${{error.stderr || ''}'.trim() || error.message
+      error: `${error.stdout || ''}${error.stderr || ''}`.trim() || error.message
     };
   }
 }
@@ -288,7 +288,7 @@ function restartSophie() {
   } catch (error) {
     return {
       ok: false,
-      error: '${{error.stdout || ''}${{error.stderr || ''}'.trim() || error.message
+      error: `${error.stdout || ''}${error.stderr || ''}`.trim() || error.message
     };
   }
 }

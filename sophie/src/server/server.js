@@ -462,7 +462,7 @@ app.post('/api/self-upgrade/plan', async (req, res) => {
 
 app.post('/api/self-upgrade/chat', async (req, res) => {
   try {
-    const { passcode, command, checkpoint = true, restart = true, checkpointMessage } = req.body;
+    const { passcode, command, checkpoint = true, restart = false, checkpointMessage } = req.body;
     if (!passcode || !command) return res.status(400).json({ error: 'passcode and command are required' });
     if (!process.env.SOPHIE_ADMIN_PASSCODE || passcode !== process.env.SOPHIE_ADMIN_PASSCODE) {
       return res.status(401).json({ error: 'Incorrect passcode' });

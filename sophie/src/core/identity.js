@@ -1,3 +1,5 @@
+// Sophie interface test
+// Sophie self-upgrade test
 require('dotenv').config();
 
 const identity = {
