@@ -36,7 +36,7 @@ function normalizeProjectPath(filePath) {
   }
 
   if (BLOCKED.some(pattern => pattern.test(relative))) {
-    throw new Error('Blocked path: ${{relative}');
+    throw new Error(`Blocked path: ${relative}`);
   }
 
   return { absolute, relative: relative.replace(/\\/g, '/') };
@@ -76,7 +76,7 @@ function syntaxCheck(absolutePath) {
 
 function validateChanges(changes) {
   if (!Array.isArray(changes) || changes.length === 0) throw new Error('No file changes supplied');
-  if (changes.length > MAX_FILES) throw new Error('A single upgrade may modify at most ${{MAX_FILES} files');
+  if (changes.length > MAX_FILES) throw new Error(`A single upgrade may modify at most ${MAX_FILES} files`);
 
   const seen = new Set();
   let totalChars = 0;
@@ -87,16 +87,16 @@ function validateChanges(changes) {
     }
 
     if (change.content.length > MAX_FILE_CHARS) {
-      throw new Error('File ${{change.path} exceeds the ${{MAX_FILE_CHARS}-character limit');
+      throw new Error(`File ${change.path} exceeds the ${MAX_FILE_CHARS}-character limit`);
     }
 
     totalChars += change.content.length;
     if (totalChars > MAX_TOTAL_CHARS) {
-      throw new Error('Upgrade exceeds the ${{MAX_TOTAL_CHARS}-character total change limit');
+      throw new Error(`Upgrade exceeds the ${MAX_TOTAL_CHARS}-character total change limit`);
     }
 
     const resolved = normalizeProjectPath(change.path);
-    if (seen.has(resolved.relative)) throw new Error('Duplicate change path: ${{resolved.relative}');
+    if (seen.has(resolved.relative)) throw new Error(`Duplicate change path: ${resolved.relative}`);
     seen.add(resolved.relative);
 
     return { path: resolved.relative, absolute: resolved.absolute, content: change.content };
@@ -146,7 +146,7 @@ function writeFiles(changes) {
   try {
     for (const change of normalized) {
       fs.mkdirSync(path.dirname(change.absolute), { recursive: true });
-      const temporary = '${{change.absolute}.self-upgrade.tmp';
+      const temporary = `${change.absolute}.self-upgrade.tmp`;
       fs.writeFileSync(temporary, change.content, 'utf8');
 
       try {
@@ -166,7 +166,7 @@ function writeFiles(changes) {
 
     if (failed) {
       restoreBackup(backup);
-      throw new Error('Syntax validation failed for ${{failed.path}: ${{failed.error}');
+      throw new Error(`Syntax validation failed for ${failed.path}: ${failed.error}`);
     }
 
     return {
@@ -180,7 +180,7 @@ function writeFiles(changes) {
     try {
       restoreBackup(backup);
     } catch (restoreError) {
-      error.message += ' | ROLLBACK ERROR: ${{restoreError.message}';
+      error.message += ` | ROLLBACK ERROR: ${restoreError.message}`;
     }
     throw error;
   }
