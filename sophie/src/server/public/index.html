@@ -1671,6 +1671,7 @@ async function sendCommand(command, isVoice, displayText) {
   try {
     const response = await fetch('/api/command', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command: commandTrimmed })
     });
