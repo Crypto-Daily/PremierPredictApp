@@ -218,7 +218,7 @@ async function planUpgrade(command) {
       'Planner produced no safe file changes. Planner response keys: ' +
       keys +
       '. Raw change count: ' +
-      rawChanges.length
+      changes.length
     );
   }
 
