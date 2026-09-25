@@ -473,11 +473,52 @@
     }
 
     #primaryBtn.listening { background: #C97A7A; }
+
+#primaryBtn.stop-active {
+  transform: scale(0.96);
+}
+
+#primaryBtn.stop-active svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
     #primaryBtn:disabled, #plusBtn:disabled { opacity: 0.5; }
 
     #cameraInput, #fileInput { display: none; }
 
     .icon-svg { display: block; }
+
+    .sophie-activity {
+      padding: 9px 12px;
+      margin: 6px 0;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 12px;
+      opacity: 0.95;
+      max-width: 92%;
+    }
+
+    .sophie-activity-title {
+      display: inline;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+
+    .sophie-activity-status {
+      display: inline;
+      opacity: 0.72;
+      min-height: 0;
+    }
+
+    .sophie-activity-time {
+      display: inline;
+      margin-left: 8px;
+      font-variant-numeric: tabular-nums;
+      opacity: 0.5;
+      font-size: 11px;
+    }
 
     .typing-dots {
       display: inline-flex;
@@ -1437,10 +1478,43 @@ function addMessage(text, type, extraClass = '', sourceCommand = null) {
 
 function showThinking() {
   const div = document.createElement('div');
-  div.className = 'message sophie thinking';
-  div.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  div.className = 'message sophie thinking sophie-activity';
+
+  div.innerHTML = `
+    <div class="sophie-activity-title">🟢 Sophie is working</div>
+    <div class="sophie-activity-status">Processing your request...</div>
+    <div class="sophie-activity-time">00:00</div>
+  `;
+
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
+
+  const statusElement = div.querySelector('.sophie-activity-status');
+  const timeElement = div.querySelector('.sophie-activity-time');
+
+  let seconds = 0;
+
+  div.setActivityStatus = (status) => {
+    if (statusElement && status) {
+      statusElement.textContent = status;
+    }
+  };
+
+  const clockTimer = setInterval(() => {
+    if (!document.body.contains(div)) return;
+
+    seconds++;
+
+    const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
+    const secs = String(seconds % 60).padStart(2, '0');
+
+    timeElement.textContent = `${minutes}:${secs}`;
+  }, 1000);
+
+  div._cleanupActivity = () => {
+    clearInterval(clockTimer);
+  };
+
   return div;
 }
 
@@ -1656,11 +1730,116 @@ function maybeSpeak(text, wasVoiceTriggered) {
   if (wasVoiceTriggered) speak(text);
 }
 
+let activeRequestId = null;
+let activeRequestController = null;
+let activityPollTimer = null;
+
+function createRequestId() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+
+  return Date.now().toString(36) + '-' +
+    Math.random().toString(36).slice(2) + '-' +
+    Math.random().toString(36).slice(2);
+}
+
+function stopActivityPolling() {
+  if (activityPollTimer) {
+    clearInterval(activityPollTimer);
+    activityPollTimer = null;
+  }
+}
+
+function startActivityPolling(requestId, thinkingElement) {
+  stopActivityPolling();
+
+  const poll = async () => {
+    if (!requestId || !thinkingElement) return;
+
+    try {
+      const response = await fetch(
+        '/api/command/status/' + encodeURIComponent(requestId),
+        {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store'
+        }
+      );
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      if (data.status && thinkingElement.setActivityStatus) {
+        thinkingElement.setActivityStatus(data.status);
+      }
+
+      if (
+        data.status === 'complete' ||
+        data.status === 'cancelled' ||
+        data.status === 'error'
+      ) {
+        stopActivityPolling();
+      }
+    } catch (error) {
+      console.debug('[SOPHIE] Activity polling:', error.message);
+    }
+  };
+
+  poll();
+  activityPollTimer = setInterval(poll, 700);
+}
+
+async function cancelCurrentCommand() {
+  if (!activeRequestId) return;
+
+  const requestId = activeRequestId;
+
+  try {
+    const response = await fetch(
+      '/api/command/' + encodeURIComponent(requestId) + '/cancel',
+      {
+        method: 'POST',
+        credentials: 'same-origin'
+      }
+    );
+
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {}
+
+    if (!response.ok) {
+      console.error('Cancel failed:', data.error || response.statusText);
+      return;
+    }
+
+    console.log('[SOPHIE] Request cancelled:', requestId);
+
+    stopActivityPolling();
+
+    if (activeRequestController) {
+      activeRequestController.abort();
+    }
+
+    activeRequestId = null;
+    commandBusy = false;
+    updatePrimaryButton();
+  } catch (error) {
+    console.error('Cancel request failed:', error);
+  }
+}
+
 async function sendCommand(command, isVoice, displayText) {
   const commandTrimmed = command.trim();
   if (!commandTrimmed || commandBusy) return;
 
   commandBusy = true;
+
+  // Create the ID BEFORE contacting the server so Stop is available immediately.
+  activeRequestId = createRequestId();
+
   setEmptyState(false);
   addMessage(displayText || commandTrimmed, 'user');
   input.value = '';
@@ -1668,12 +1847,21 @@ async function sendCommand(command, isVoice, displayText) {
 
   const thinkingElement = showThinking();
 
+  const thinkingElement = showThinking();
+  startActivityPolling(activeRequestId, thinkingElement);
+
   try {
+    activeRequestController = new AbortController();
+
     const response = await fetch('/api/command', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: commandTrimmed })
+      signal: activeRequestController.signal,
+      body: JSON.stringify({
+        command: commandTrimmed,
+        requestId: activeRequestId
+      })
     });
 
     let data;
@@ -1681,7 +1869,15 @@ async function sendCommand(command, isVoice, displayText) {
 
     if (!response.ok) throw new Error(data.error || 'Command request failed.');
 
-    if (thinkingElement) thinkingElement.remove();
+    if (data.requestId) {
+      activeRequestId = data.requestId;
+      updatePrimaryButton();
+    }
+
+    if (thinkingElement) {
+      if (thinkingElement._cleanupActivity) thinkingElement._cleanupActivity();
+      thinkingElement.remove();
+    }
 
     if (data.text) {
       addMessage(data.text, 'sophie', '', commandTrimmed);
@@ -1693,19 +1889,48 @@ async function sendCommand(command, isVoice, displayText) {
     await loadThreads();
 
   } catch (error) {
-    if (thinkingElement) thinkingElement.remove();
+    if (thinkingElement) {
+      if (thinkingElement._cleanupActivity) thinkingElement._cleanupActivity();
+      thinkingElement.remove();
+    }
     console.error('Command error:', error);
     addMessage('I could not connect to my core. ' + error.message, 'sophie');
   } finally {
+    activeRequestController = null;
     commandBusy = false;
+    activeRequestId = null;
+    stopActivityPolling();
+    updatePrimaryButton();
   }
 }
 
+const STOP_SVG = `
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="6.5" y="6.5" width="11" height="11" rx="1.8"
+          fill="none" stroke="currentColor" stroke-width="2.2"/>
+  </svg>
+`;
+
 function updatePrimaryButton() {
+  if (commandBusy && activeRequestId) {
+    primaryBtn.innerHTML = STOP_SVG;
+    primaryBtn.title = 'Stop';
+    primaryBtn.setAttribute('aria-label', 'Stop Sophie');
+    primaryBtn.classList.add('stop-active');
+    return;
+  }
+
+  primaryBtn.classList.remove('stop-active');
+
   const hasText = input.value.trim().length > 0;
   const showSend = hasText || !!pendingImage || !!pendingFile;
+
   primaryBtn.innerHTML = showSend ? SEND_SVG : MIC_SVG;
   primaryBtn.title = showSend ? 'Send' : 'Voice input';
+  primaryBtn.setAttribute(
+    'aria-label',
+    showSend ? 'Send message' : 'Voice input'
+  );
 }
 
 input.addEventListener('input', () => {
@@ -1716,7 +1941,12 @@ input.addEventListener('input', () => {
 
 primaryBtn.addEventListener('click', handleSend);
 
-function handleSend() {
+async function handleSend() {
+  if (commandBusy && activeRequestId) {
+    await cancelCurrentCommand();
+    return;
+  }
+
   if (pendingImage) {
     sendWithImage();
   } else if (pendingFile) {
@@ -1893,8 +2123,6 @@ async function sendWithImage() {
   input.value = '';
   updatePrimaryButton();
 
-  const thinkingElement = showThinking();
-
   try {
     const base64Data = await blobToBase64(imageBlob);
 
@@ -1909,7 +2137,10 @@ async function sendWithImage() {
 
     if (!response.ok) throw new Error(data.error || data.details || 'Vision request failed.');
 
-    if (thinkingElement) thinkingElement.remove();
+    if (thinkingElement) {
+      if (thinkingElement._cleanupActivity) thinkingElement._cleanupActivity();
+      thinkingElement.remove();
+    }
 
     if (data.text) {
       addMessage(data.text, 'sophie');
@@ -1919,7 +2150,10 @@ async function sendWithImage() {
 
   } catch (error) {
     console.error('Vision error:', error);
-    if (thinkingElement) thinkingElement.remove();
+    if (thinkingElement) {
+      if (thinkingElement._cleanupActivity) thinkingElement._cleanupActivity();
+      thinkingElement.remove();
+    }
 
     let message = 'I could not analyze that image. ';
     if (error.message.toLowerCase().includes('failed to fetch')) {
