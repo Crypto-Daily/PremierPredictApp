@@ -1492,13 +1492,22 @@ function showThinking() {
   const statusElement = div.querySelector('.sophie-activity-status');
   const timeElement = div.querySelector('.sophie-activity-time');
 
+  const statuses = [
+    'Understanding your request...',
+    'Planning the task...',
+    'Working with my tools...',
+    'Inspecting relevant information...',
+    'Processing results...'
+  ];
+
+  let statusIndex = 0;
   let seconds = 0;
 
-  div.setActivityStatus = (status) => {
-    if (statusElement && status) {
-      statusElement.textContent = status;
-    }
-  };
+  const statusTimer = setInterval(() => {
+    if (!document.body.contains(div)) return;
+    statusIndex = (statusIndex + 1) % statuses.length;
+    statusElement.textContent = statuses[statusIndex];
+  }, 2200);
 
   const clockTimer = setInterval(() => {
     if (!document.body.contains(div)) return;
@@ -1512,6 +1521,7 @@ function showThinking() {
   }, 1000);
 
   div._cleanupActivity = () => {
+    clearInterval(statusTimer);
     clearInterval(clockTimer);
   };
 
@@ -1731,65 +1741,6 @@ function maybeSpeak(text, wasVoiceTriggered) {
 }
 
 let activeRequestId = null;
-let activeRequestController = null;
-let activityPollTimer = null;
-
-function createRequestId() {
-  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-    return window.crypto.randomUUID();
-  }
-
-  return Date.now().toString(36) + '-' +
-    Math.random().toString(36).slice(2) + '-' +
-    Math.random().toString(36).slice(2);
-}
-
-function stopActivityPolling() {
-  if (activityPollTimer) {
-    clearInterval(activityPollTimer);
-    activityPollTimer = null;
-  }
-}
-
-function startActivityPolling(requestId, thinkingElement) {
-  stopActivityPolling();
-
-  const poll = async () => {
-    if (!requestId || !thinkingElement) return;
-
-    try {
-      const response = await fetch(
-        '/api/command/status/' + encodeURIComponent(requestId),
-        {
-          method: 'GET',
-          credentials: 'same-origin',
-          cache: 'no-store'
-        }
-      );
-
-      if (!response.ok) return;
-
-      const data = await response.json();
-
-      if (data.status && thinkingElement.setActivityStatus) {
-        thinkingElement.setActivityStatus(data.status);
-      }
-
-      if (
-        data.status === 'complete' ||
-        data.status === 'cancelled' ||
-        data.status === 'error'
-      ) {
-        stopActivityPolling();
-      }
-    } catch (error) {
-      console.debug('[SOPHIE] Activity polling:', error.message);
-    }
-  };
-
-  poll();
-  activityPollTimer = setInterval(poll, 700);
-}
 
 async function cancelCurrentCommand() {
   if (!activeRequestId) return;
@@ -1797,13 +1748,10 @@ async function cancelCurrentCommand() {
   const requestId = activeRequestId;
 
   try {
-    const response = await fetch(
-      '/api/command/' + encodeURIComponent(requestId) + '/cancel',
-      {
-        method: 'POST',
-        credentials: 'same-origin'
-      }
-    );
+    const response = await fetch('/api/command/' + encodeURIComponent(requestId) + '/cancel', {
+      method: 'POST',
+      credentials: 'same-origin'
+    });
 
     let data = {};
     try {
@@ -1816,16 +1764,6 @@ async function cancelCurrentCommand() {
     }
 
     console.log('[SOPHIE] Request cancelled:', requestId);
-
-    stopActivityPolling();
-
-    if (activeRequestController) {
-      activeRequestController.abort();
-    }
-
-    activeRequestId = null;
-    commandBusy = false;
-    updatePrimaryButton();
   } catch (error) {
     console.error('Cancel request failed:', error);
   }
@@ -1836,26 +1774,18 @@ async function sendCommand(command, isVoice, displayText) {
   if (!commandTrimmed || commandBusy) return;
 
   commandBusy = true;
-
-  // Create the ID BEFORE contacting the server so Stop is available immediately.
-  activeRequestId = createRequestId();
-
   setEmptyState(false);
   addMessage(displayText || commandTrimmed, 'user');
   input.value = '';
   updatePrimaryButton();
 
   const thinkingElement = showThinking();
-  startActivityPolling(activeRequestId, thinkingElement);
 
   try {
-    activeRequestController = new AbortController();
-
     const response = await fetch('/api/command', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      signal: activeRequestController.signal,
       body: JSON.stringify({
         command: commandTrimmed,
         requestId: activeRequestId
@@ -1894,10 +1824,8 @@ async function sendCommand(command, isVoice, displayText) {
     console.error('Command error:', error);
     addMessage('I could not connect to my core. ' + error.message, 'sophie');
   } finally {
-    activeRequestController = null;
     commandBusy = false;
     activeRequestId = null;
-    stopActivityPolling();
     updatePrimaryButton();
   }
 }
@@ -2120,6 +2048,8 @@ async function sendWithImage() {
   addMessage(userLabel, 'user');
   input.value = '';
   updatePrimaryButton();
+
+  const thinkingElement = showThinking();
 
   try {
     const base64Data = await blobToBase64(imageBlob);

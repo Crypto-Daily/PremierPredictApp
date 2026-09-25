@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const { randomUUID } = require('node:crypto');
 const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
@@ -144,6 +145,37 @@ const moduleManager =
 const memory =
   new Memory();
 
+const activeCommands = new Map();
+
+function updateCommandStatus(requestId, patch = {}) {
+  const task = activeCommands.get(requestId);
+  if (!task) return;
+
+  Object.assign(task, patch, {
+    updatedAt: Date.now()
+  });
+}
+
+function summarizeHermesEvent(event) {
+  const tool = String(
+    event?.tool || event?.name || ''
+  ).toLowerCase();
+
+  const map = {
+    read_file: 'Reading files…',
+    search_files: 'Searching files…',
+    terminal: 'Running terminal inspection…',
+    execute_code: 'Running code…',
+    write_file: 'Writing a file…',
+    browser: 'Using the browser…',
+    web_search: 'Searching the web…',
+    system: 'Starting Hermes…'
+  };
+
+  return map[tool] ||
+    (tool ? 'Hermes: ' + tool : null);
+}
+
 const commandProcessor =
   new CommandProcessor({
     identity,
@@ -213,8 +245,24 @@ app.post('/api/command', async (req, res) => {
 
   try {
 
-    const { command } =
+    const { command, requestId: suppliedRequestId } =
       req.body;
+
+    const requestId =
+      typeof suppliedRequestId === 'string' &&
+      suppliedRequestId.trim()
+        ? suppliedRequestId.trim()
+        : randomUUID();
+
+    const controller = new AbortController();
+
+    activeCommands.set(requestId, {
+      controller,
+      status: 'working',
+      activity: 'Planning the task…',
+      startedAt: Date.now(),
+      updatedAt: Date.now()
+    });
 
     const upgradeAuthorized = hasUpgradeSession(req);
 
@@ -236,8 +284,27 @@ app.post('/api/command', async (req, res) => {
     const result =
       await commandProcessor.process(
         command,
-        { upgradeAuthorized }
+        {
+          upgradeAuthorized,
+          signal: controller.signal,
+          onEvent: event => {
+            const activity =
+              summarizeHermesEvent(event);
+
+            if (activity) {
+              updateCommandStatus(
+                requestId,
+                { activity }
+              );
+            }
+          }
+        }
       );
+
+    updateCommandStatus(requestId, {
+      status: 'complete',
+      activity: 'Completed.'
+    });
 
     console.log(
       '[COMMAND] Response ready'
@@ -256,12 +323,37 @@ app.post('/api/command', async (req, res) => {
     }
 
     if (!res.headersSent) {
-
-      res.json(result);
-
+      res.json({
+        ...result,
+        requestId
+      });
     }
 
+    setTimeout(
+      () => activeCommands.delete(requestId),
+      60000
+    );
+
   } catch (error) {
+
+    const requestId =
+      typeof req.body?.requestId === 'string'
+        ? req.body.requestId
+        : null;
+
+    if (requestId) {
+      updateCommandStatus(requestId, {
+        status:
+          error?.code === 'HERMES_CANCELLED'
+            ? 'cancelled'
+            : 'error',
+
+        activity:
+          error?.code === 'HERMES_CANCELLED'
+            ? 'Stopped by you.'
+            : 'Request failed.'
+      });
+    }
 
     console.error(
       '[COMMAND] ERROR:',
@@ -280,6 +372,70 @@ app.post('/api/command', async (req, res) => {
   }
 
 });
+
+/*
+ * --------------------------------------------------
+ * COMMAND STATUS / CANCEL
+ * --------------------------------------------------
+ */
+
+app.get(
+  '/api/command/status/:requestId',
+  (req, res) => {
+    const task =
+      activeCommands.get(req.params.requestId);
+
+    if (!task) {
+      return res.status(404).json({
+        error: 'Request not found.'
+      });
+    }
+
+    res.json({
+      requestId: req.params.requestId,
+      status: task.status,
+      activity: task.activity,
+      startedAt: task.startedAt,
+      updatedAt: task.updatedAt
+    });
+  }
+);
+
+app.post(
+  '/api/command/:requestId/cancel',
+  (req, res) => {
+    const task =
+      activeCommands.get(req.params.requestId);
+
+    if (!task) {
+      return res.status(404).json({
+        error: 'Request not found.'
+      });
+    }
+
+    if (task.status !== 'working') {
+      return res.json({
+        ok: true,
+        status: task.status
+      });
+    }
+
+    updateCommandStatus(
+      req.params.requestId,
+      {
+        status: 'cancelling',
+        activity: 'Stopping…'
+      }
+    );
+
+    task.controller.abort();
+
+    res.json({
+      ok: true,
+      status: 'cancelling'
+    });
+  }
+);
 
 /*
  * --------------------------------------------------

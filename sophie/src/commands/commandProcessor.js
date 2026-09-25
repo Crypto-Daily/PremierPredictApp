@@ -1,3 +1,4 @@
+const { routeTool } = require('../tools/toolRouter');
 const { askWithFallback, askAllRanked } = require('../ai/providerRouter');
 const { routeIntent } = require('../ai/intentRouter');
 const { buildSophiePrompt } = require('../ai/prompt');
@@ -41,6 +42,7 @@ Writing/editing my own files is protected by Upgrade Mode. Authenticate in Setti
 
 const PATH_ALIASES = {
   'the server': null,
+  'my server': null,
   'server': null,
   'everything': null,
   'the whole server': '/',
@@ -306,6 +308,47 @@ class CommandProcessor {
 
       this.memory.addMessage('assistant', text);
       return { type: 'response', text };
+    }
+
+    /*
+     * Hermes tool routing.
+     *
+     * Protected self-upgrade and self-inspection branches above
+     * remain exclusively handled by Sophie.
+     */
+    try {
+      const toolResult = await routeTool(command, {
+        intent,
+        signal: options.signal,
+        onEvent: options.onEvent
+      });
+
+      if (toolResult?.handled) {
+        const response = toolResult.response;
+
+        this.memory.addMessage('assistant', response);
+
+        console.log(`[TOOL] ${toolResult.tool} handled the request.`);
+
+        return {
+          type: 'response',
+          text: response,
+          tool: toolResult.tool,
+          sessionId: toolResult.sessionId || null
+        };
+      }
+    } catch (error) {
+      console.error('[TOOL] Hermes error:', error);
+
+      const text =
+        'I tried to use my external agent capability, but it is unavailable right now.';
+
+      this.memory.addMessage('assistant', text);
+
+      return {
+        type: 'response',
+        text
+      };
     }
 
     try {
