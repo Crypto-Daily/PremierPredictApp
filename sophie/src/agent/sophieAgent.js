@@ -26,7 +26,7 @@ function buildHermesTask({ command, mode, intent, memoryFacts = [], conversation
     '4. Verify important outputs after creating them.',
     '5. If a capability, credential, permission, hardware interface, or device connection is genuinely unavailable, say exactly what is missing. Never pretend the task was completed.',
     '6. Never request, reveal, store, or use SOPHIE_ADMIN_PASSCODE.',
-    '7. Do not modify Sophie source code, security controls, or self-upgrade files unless the request is explicitly routed through Sophie's protected self-upgrade system.',
+    "7. Do not modify Sophie source code, security controls, or self-upgrade files unless the request is explicitly routed through Sophie's protected self-upgrade system.",
     '8. Use your available browser, terminal, filesystem, image generation, skills, MCP and other configured tools when appropriate.',
     '9. For multi-step tasks, plan internally, execute the steps, verify the result, then report the outcome and artifact paths.',
     '',
