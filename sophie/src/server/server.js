@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
 const cors = require('cors');
 const path = require('path');
@@ -586,6 +587,66 @@ app.post('/api/vision', async (req, res) => {
 
   }
 
+});
+
+app.post('/api/jarvis/screen', async (req, res) => {
+  let capturePath = null;
+
+  try {
+    if (!modeManager.isJarvis()) {
+      return res.status(409).json({
+        error: 'Screen perception is available in Jarvis Mode. Switch modes first.'
+      });
+    }
+
+    const { image, question } = req.body || {};
+
+    if (!image) {
+      return res.status(400).json({ error: 'A screen image is required.' });
+    }
+
+    const captureDir = path.join(process.cwd(), 'data', 'jarvis-captures');
+    fs.mkdirSync(captureDir, { recursive: true });
+
+    capturePath = path.join(
+      captureDir,
+      'screen-' + Date.now() + '-' + randomUUID() + '.jpg'
+    );
+
+    fs.writeFileSync(capturePath, Buffer.from(image, 'base64'));
+
+    const command =
+      'Analyze the current user screen using your vision capability. ' +
+      'The screenshot is available at: ' + capturePath + '. ' +
+      (question || 'Tell the user what is visible and what can be done with it.');
+
+    const controller = new AbortController();
+
+    const result = await commandProcessor.process(command, {
+      upgradeAuthorized: hasUpgradeSession(req),
+      signal: controller.signal,
+      onEvent: () => {}
+    });
+
+    res.json({
+      type: 'jarvis_screen',
+      text: result.text,
+      artifacts: result.artifacts || []
+    });
+  } catch (error) {
+    console.error('[JARVIS SCREEN] ERROR:', error);
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Jarvis screen analysis failed.',
+        details: error.message
+      });
+    }
+  } finally {
+    if (capturePath) {
+      try { fs.unlinkSync(capturePath); } catch {}
+    }
+  }
 });
 
 /*
