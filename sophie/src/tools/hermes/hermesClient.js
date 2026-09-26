@@ -8,6 +8,7 @@ const HERMES_BIN =
 const DEFAULT_TIMEOUT_MS = 600000;
 const DEFAULT_MAX_CONTINUATIONS = 1;
 const MAX_OUTPUT_CHARS = 500000;
+const DEFAULT_TOOLSETS = process.env.HERMES_TOOLSETS || 'hermes-cli';
 
 function buildHermesEnv() {
   const env = { ...process.env };
@@ -119,8 +120,10 @@ function runHermesOnce(query, options = {}) {
     args.push('--model', options.model);
   }
 
-  if (options.toolsets) {
-    args.push('--toolsets', options.toolsets);
+  const toolsets = options.toolsets || DEFAULT_TOOLSETS;
+
+  if (toolsets) {
+    args.push('--toolsets', toolsets);
   }
 
   if (options.resumeSessionId) {
