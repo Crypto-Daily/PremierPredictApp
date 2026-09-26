@@ -61,7 +61,15 @@ function diff(before) {
 function resolveArtifact(relative) {
   const fullPath = safePath(relative);
   if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) throw new Error('Artifact does not exist.');
-  return fullPath;
+
+  const realRoot = fs.realpathSync(WORKSPACE_ROOT);
+  const realFile = fs.realpathSync(fullPath);
+  const relative = path.relative(realRoot, realFile);
+  if (relative.startsWith('..' + path.sep) || relative === '..' || path.isAbsolute(relative)) {
+    throw new Error('Artifact path is outside the Sophie workspace.');
+  }
+
+  return realFile;
 }
 
 module.exports = { WORKSPACE_ROOT, listArtifacts, snapshot, diff, resolveArtifact };
