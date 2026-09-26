@@ -13,6 +13,8 @@ const CommandProcessor = require('../commands/commandProcessor');
 const { analyzeImage } = require('../ai/vision');
 const { writeProjectFile } = require('../core/selfWrite');
 const { planUpgrade, planAndApplyUpgrade } = require('../core/selfUpgradePlanner');
+const { ModeManager } = require('../core/modeManager');
+const { listArtifacts, resolveArtifact, WORKSPACE_ROOT } = require('../core/artifactManager');
 const {
   applyUpgrade,
   validateProject,
@@ -145,6 +147,9 @@ const moduleManager =
 const memory =
   new Memory();
 
+const modeManager =
+  new ModeManager();
+
 const activeCommands = new Map();
 
 function updateCommandStatus(requestId, patch = {}) {
@@ -180,7 +185,8 @@ const commandProcessor =
   new CommandProcessor({
     identity,
     moduleManager,
-    memory
+    memory,
+    modeManager
   });
 
 /*
@@ -225,7 +231,10 @@ app.get('/api/status', (req, res) => {
       moduleManager.discover(),
 
     memoryFacts:
-      memory.getFacts().length
+      memory.getFacts().length,
+
+    mode:
+      modeManager.describe()
 
   });
 
@@ -233,9 +242,31 @@ app.get('/api/status', (req, res) => {
 
 /*
  * --------------------------------------------------
+ * OPERATING MODE
+ * --------------------------------------------------
+ */
+
+app.get('/api/mode', (req, res) => {
+  res.json(modeManager.describe());
+});
+
+app.post('/api/mode', (req, res) => {
+  try {
+    const { mode } = req.body || {};
+    const selected = modeManager.setMode(mode);
+    res.json(modeManager.describe());
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+/*
+ * --------------------------------------------------
  * COMMAND
  * --------------------------------------------------
  */
+
+
 
 app.post('/api/command', async (req, res) => {
 
@@ -439,9 +470,37 @@ app.post(
 
 /*
  * --------------------------------------------------
+ * ARTIFACTS
+ * --------------------------------------------------
+ */
+
+app.get('/api/artifacts', (req, res) => {
+  try {
+    res.json({
+      workspace: WORKSPACE_ROOT,
+      artifacts: listArtifacts()
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Could not list workspace artifacts.' });
+  }
+});
+
+app.get('/api/artifacts/download', (req, res) => {
+  try {
+    const filePath = resolveArtifact(req.query.path);
+    res.download(filePath, path.basename(filePath));
+  } catch (error) {
+    res.status(404).json({ error: error.message });
+  }
+});
+
+/*
+ * --------------------------------------------------
  * VISION
  * --------------------------------------------------
  */
+
+
 
 app.post('/api/vision', async (req, res) => {
 
