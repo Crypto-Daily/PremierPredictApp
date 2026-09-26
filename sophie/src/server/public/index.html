@@ -880,6 +880,9 @@
       <div class="quick-action" data-action="image">
         <span class="qa-icon">🖼</span> Analyze an image
       </div>
+      <div class="quick-action" data-action="screen">
+        <span class="qa-icon">🖥</span> Let Sophie see my screen
+      </div>
       <div class="quick-action" data-action="projects">
         <span class="qa-icon">📁</span> Browse my projects
       </div>
@@ -1790,6 +1793,8 @@ document.querySelectorAll('.quick-action').forEach(el => {
       startVoiceInput();
     } else if (action === 'image') {
       cameraInput.click();
+    } else if (action === 'screen') {
+      captureScreenForJarvis();
     } else if (action === 'projects') {
       openSidebar();
     }
@@ -2073,8 +2078,9 @@ function startVoiceInput() {
 plusBtn.addEventListener('click', () => {
   if (visionBusy || commandBusy) return;
   const rect = plusBtn.getBoundingClientRect();
-  showPopupMenu(rect.left, rect.top - 96, [
+  showPopupMenu(rect.left, rect.top - 132, [
     { label: '📷 Photo', onClick: () => cameraInput.click() },
+    { label: '🖥 Screen', onClick: () => captureScreenForJarvis() },
     { label: '📄 File', onClick: () => fileInput.click() }
   ]);
 });
@@ -2165,6 +2171,84 @@ removeFilePreview.addEventListener('click', () => {
   clearPendingFile();
   updatePrimaryButton();
 });
+
+
+async function captureScreenForJarvis() {
+  if (commandBusy || visionBusy) return;
+
+  try {
+    const modeResponse = await fetch('/api/mode', { cache: 'no-store' });
+    const modeData = await modeResponse.json();
+
+    if (modeData.mode !== 'JARVIS') {
+      addMessage('Switch to Jarvis Mode first, then I can inspect your shared screen.', 'sophie');
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      addMessage('This browser does not support screen sharing.', 'sophie');
+      return;
+    }
+
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+      preferCurrentTab: false,
+      selfBrowserSurface: 'exclude'
+    });
+
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.muted = true;
+    await video.play();
+
+    await new Promise(resolve => {
+      if (video.readyState >= 2) resolve();
+      else video.onloadeddata = resolve;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.min(video.videoWidth || 1280, 1600);
+    canvas.height = Math.round((video.videoHeight || 720) * (canvas.width / (video.videoWidth || 1280)));
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not capture the shared screen.');
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    stream.getTracks().forEach(track => track.stop());
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.78));
+    if (!blob) throw new Error('Could not encode the screen capture.');
+
+    const base64 = await blobToBase64(blob);
+
+    setEmptyState(false);
+    addMessage('🖥 Screen shared with Sophie', 'user');
+    const thinkingElement = showThinking();
+    thinkingElement.querySelector('.sophie-activity-status').textContent = 'Analyzing your screen...';
+
+    const response = await fetch('/api/jarvis/screen', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.error || data.details || 'Screen analysis failed.');
+
+    if (thinkingElement._cleanupActivity) thinkingElement._cleanupActivity();
+    thinkingElement.remove();
+
+    addMessage(data.text || 'I could not determine what is on the screen.', 'sophie');
+    addArtifactLinks(data.artifacts);
+  } catch (error) {
+    console.error('Jarvis screen error:', error);
+    addMessage('I could not inspect the screen: ' + error.message, 'sophie');
+  }
+}
 
 async function sendWithFile() {
   if (!pendingFile) return;
