@@ -773,7 +773,45 @@
       border-color: #C97A7A;
       font-weight: 600;
     }
-  </style>
+  
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mode-btn {
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+  border-radius: 10px;
+  padding: 10px 8px;
+  cursor: pointer;
+}
+.mode-btn.active {
+  border-color: var(--brass);
+  background: rgba(176,141,87,0.14);
+}
+.mode-description {
+  margin-top: 7px;
+  font-size: 12px;
+  opacity: 0.68;
+  line-height: 1.45;
+}
+.artifact-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+.artifact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  text-decoration: none;
+  color: var(--brass);
+  font-size: 12px;
+}
+
+</style>
 </head>
 
 <body>
@@ -919,6 +957,15 @@
     </div>
 
     <div class="settings-group">
+      <div class="settings-label">Operating mode</div>
+      <div class="mode-grid">
+        <button class="mode-btn" id="gptModeBtn">GPT Mode</button>
+        <button class="mode-btn" id="jarvisModeBtn">Jarvis Mode</button>
+      </div>
+      <div class="mode-description" id="modeDescription">Loading mode...</div>
+    </div>
+
+    <div class="settings-group">
       <div class="settings-label">Developer access</div>
       <div class="settings-label" id="upgradeModeStatus">Upgrade Mode is locked.</div>
       <button class="choice-btn" id="upgradeModeBtn">Enable Upgrade Mode</button>
@@ -965,6 +1012,9 @@ const fileChipName = document.getElementById('fileChipName');
 const removeFilePreview = document.getElementById('removeFilePreview');
 const settingsBtn = document.getElementById('settingsBtn');
 const upgradeModeBtn = document.getElementById('upgradeModeBtn');
+const gptModeBtn = document.getElementById('gptModeBtn');
+const jarvisModeBtn = document.getElementById('jarvisModeBtn');
+const modeDescription = document.getElementById('modeDescription');
 const upgradeModeStatus = document.getElementById('upgradeModeStatus');
 const settingsOverlay = document.getElementById('settingsOverlay');
 const closeSettings = document.getElementById('closeSettings');
@@ -1188,6 +1238,43 @@ settingsOverlay.addEventListener('click', e => {
 
 applyPrefs();
 
+
+async function refreshMode() {
+  try {
+    const response = await fetch('/api/mode', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Mode unavailable');
+
+    const isJarvis = data.mode === 'JARVIS';
+    gptModeBtn.classList.toggle('active', !isJarvis);
+    jarvisModeBtn.classList.toggle('active', isJarvis);
+    modeDescription.textContent = data.description || '';
+  } catch (error) {
+    modeDescription.textContent = 'Mode status unavailable.';
+    console.error('Mode status error:', error);
+  }
+}
+
+async function setSophieMode(mode) {
+  try {
+    const response = await fetch('/api/mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not change mode');
+    gptModeBtn.classList.toggle('active', data.mode !== 'JARVIS');
+    jarvisModeBtn.classList.toggle('active', data.mode === 'JARVIS');
+    modeDescription.textContent = data.description || '';
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+gptModeBtn.addEventListener('click', () => setSophieMode('GPT'));
+jarvisModeBtn.addEventListener('click', () => setSophieMode('JARVIS'));
+
 async function refreshUpgradeMode() {
   try {
     const response = await fetch('/api/self-upgrade/session', { cache: 'no-store' });
@@ -1206,7 +1293,8 @@ upgradeModeBtn.addEventListener('click', async () => {
 
   if (active) {
     await fetch('/api/self-upgrade/session', { method: 'DELETE' });
-    await refreshUpgradeMode();
+    await refreshMode();
+refreshUpgradeMode();
     return;
   }
 
@@ -1769,6 +1857,65 @@ async function cancelCurrentCommand() {
   }
 }
 
+
+function addArtifactLinks(artifacts) {
+  if (!Array.isArray(artifacts) || artifacts.length === 0) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'artifact-list';
+
+  artifacts.forEach(artifact => {
+    const link = document.createElement('a');
+    link.className = 'artifact-link';
+    link.href = '/api/artifacts/download?path=' + encodeURIComponent(artifact.path);
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = '📎 ' + artifact.path;
+    wrap.appendChild(link);
+  });
+
+  messages.appendChild(wrap);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function createRequestId() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+
+  return 'sophie-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+}
+
+let activityPollTimer = null;
+
+function startActivityPolling(requestId, thinkingElement) {
+  if (activityPollTimer) clearInterval(activityPollTimer);
+
+  activityPollTimer = setInterval(async () => {
+    if (!document.body.contains(thinkingElement)) return;
+
+    try {
+      const response = await fetch('/api/command/status/' + encodeURIComponent(requestId), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const statusElement = thinkingElement.querySelector('.sophie-activity-status');
+      if (statusElement && data.activity) statusElement.textContent = data.activity;
+    } catch {}
+  }, 700);
+}
+
+function stopActivityPolling() {
+  if (activityPollTimer) {
+    clearInterval(activityPollTimer);
+    activityPollTimer = null;
+  }
+}
+
 async function sendCommand(command, isVoice, displayText) {
   const commandTrimmed = command.trim();
   if (!commandTrimmed || commandBusy) return;
@@ -1779,7 +1926,10 @@ async function sendCommand(command, isVoice, displayText) {
   input.value = '';
   updatePrimaryButton();
 
+  activeRequestId = createRequestId();
   const thinkingElement = showThinking();
+  startActivityPolling(activeRequestId, thinkingElement);
+  updatePrimaryButton();
 
   try {
     const response = await fetch('/api/command', {
@@ -1797,18 +1947,15 @@ async function sendCommand(command, isVoice, displayText) {
 
     if (!response.ok) throw new Error(data.error || 'Command request failed.');
 
-    if (data.requestId) {
-      activeRequestId = data.requestId;
-      updatePrimaryButton();
-    }
-
     if (thinkingElement) {
       if (thinkingElement._cleanupActivity) thinkingElement._cleanupActivity();
+      stopActivityPolling();
       thinkingElement.remove();
     }
 
     if (data.text) {
       addMessage(data.text, 'sophie', '', commandTrimmed);
+      addArtifactLinks(data.artifacts);
       maybeSpeak(data.text, isVoice);
     } else {
       addMessage(JSON.stringify(data, null, 2), 'sophie');
@@ -1825,6 +1972,7 @@ async function sendCommand(command, isVoice, displayText) {
     addMessage('I could not connect to my core. ' + error.message, 'sophie');
   } finally {
     commandBusy = false;
+    stopActivityPolling();
     activeRequestId = null;
     updatePrimaryButton();
   }
