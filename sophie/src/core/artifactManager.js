@@ -64,8 +64,8 @@ function resolveArtifact(relative) {
 
   const realRoot = fs.realpathSync(WORKSPACE_ROOT);
   const realFile = fs.realpathSync(fullPath);
-  const relative = path.relative(realRoot, realFile);
-  if (relative.startsWith('..' + path.sep) || relative === '..' || path.isAbsolute(relative)) {
+  const realRelative = path.relative(realRoot, realFile);
+  if (realRelative.startsWith('..' + path.sep) || realRelative === '..' || path.isAbsolute(realRelative)) {
     throw new Error('Artifact path is outside the Sophie workspace.');
   }
 
