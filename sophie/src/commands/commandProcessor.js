@@ -1,4 +1,5 @@
-const { routeTool } = require('../tools/toolRouter');
+const { routeAgent } = require('../agent/sophieAgent');
+
 const { askWithFallback, askAllRanked } = require('../ai/providerRouter');
 const { routeIntent } = require('../ai/intentRouter');
 const { buildSophiePrompt } = require('../ai/prompt');
@@ -15,30 +16,34 @@ const {
   findByName
 } = require('../core/selfInspect');
 
-const HELP_TEXT = `Here's what I can do with fixed, predictable commands (no guessing involved):
+const HELP_TEXT = `Sophie has two operating modes:
 
-THREADS
-- "list my projects" / "list my chats"
-- "start/create a project called X"
-- "start a new chat"
-- "switch/go to X"
+GPT MODE
+- Conversational reasoning, writing, analysis, research and normal assistant tasks.
+- When a task requires real execution, Sophie can delegate it to Hermes.
 
-MY OWN CODE (read-only)
-- "what files make up your AI system"
-- "where is your memory/vision/research/prompt/... code"
-- "I'm looking for X" / "find X" — fuzzy name search
+JARVIS MODE
+- Interactive agent mode.
+- Hermes can use authorized tools for files, browser, terminal, computer, skills, MCP and connected device workflows.
+- Camera, microphone and screen capabilities still require browser/OS permission and an actual interface.
 
-FILES ON THE SERVER (read-only, everywhere except secrets)
-- "list files in <path>" — try "the server" or "everything" for your home directory, or a real path like "/etc" or "bybit-ai-bot"
-- "read file <path>"
+REAL EXECUTION
+- Create PDF/DOCX/XLSX/PPTX/CSV files.
+- Generate images when an image-generation capability is configured.
+- Research websites and perform multi-step tasks.
+- Inspect projects, run tools and verify results.
+- Generated artifacts are saved in the Sophie workspace when appropriate.
 
-LINKS
-- Paste a URL anywhere in your message and I'll actually fetch and read it.
+MODE COMMANDS
+- "switch to GPT mode"
+- "switch to Jarvis mode"
+- "what mode are you in?"
 
-WHAT I CANNOT DO YET
-- Generate PDF/DOCX/ZIP files, create download links, or run arbitrary shell commands. If I ever claim to have done one of these, that's a bug — tell me.
+MY OWN CODE
+- Self-upgrade remains protected by Upgrade Mode.
+- Admin passcodes are never accepted through normal chat.
 
-Writing/editing my own files is protected by Upgrade Mode. Authenticate in Settings → Upgrade Mode first, then describe the change normally in chat. Passcodes typed in chat are blocked and never saved.`;
+Sophie will never claim an action happened unless the execution layer actually completed it.`;
 
 const PATH_ALIASES = {
   'the server': null,
@@ -68,13 +73,12 @@ function normalizePathArg(raw) {
 
 // Language implying a capability we don't have — answer honestly instead of
 // letting it fall through to general AI chat, which will improvise one.
-const UNSUPPORTED_ACTION_PATTERN = /\b(generate (a |the )?pdf|convert .*(to|into) (pdf|docx|word)|create (a |the )?(pdf|docx|word document|zip|download link)|download link|scan the (server|whole server)|zip (the|this) (folder|project)|signed url|temporary url)\b/i;
-
 class CommandProcessor {
-  constructor({ identity, moduleManager, memory }) {
+  constructor({ identity, moduleManager, memory, modeManager }) {
     this.identity = identity;
     this.moduleManager = moduleManager;
     this.memory = memory;
+    this.modeManager = modeManager || new ModeManager();
   }
 
   async process(input, options = {}) {
@@ -103,6 +107,23 @@ class CommandProcessor {
     this.memory.addMessage('user', command);
 
     const lower = command.toLowerCase();
+    const modeSwitchMatch = command.match(/^(?:switch|change|set|turn)\s+(?:to\s+)?(gpt|jarvis)(?:\s+mode)?$/i);
+
+    if (modeSwitchMatch) {
+      const mode = this.modeManager.setMode(modeSwitchMatch[1]);
+      const text = mode === 'JARVIS'
+        ? 'Jarvis Mode is now active. I can use authorized agent, perception, computer, browser and device capabilities when they are available.'
+        : 'GPT Mode is now active. I will use normal conversational reasoning and delegate real execution tasks when needed.';
+      this.memory.addMessage('assistant', text);
+      return { type: 'response', text, mode };
+    }
+
+    if (/^(?:what|which)\s+mode(?:\s+are\s+you\s+in)?\??$/i.test(command)) {
+      const description = this.modeManager.describe();
+      const text = 'I am in ' + description.name + '. ' + description.description;
+      this.memory.addMessage('assistant', text);
+      return { type: 'response', text, mode: description.mode };
+    }
 
     if (lower === 'hello' || lower === 'hi' || lower === 'hey sophie') {
       const text = `Hello. I am ${this.identity.name}.`;
@@ -121,12 +142,6 @@ class CommandProcessor {
       return { type: 'response', text: HELP_TEXT };
     }
 
-    if (UNSUPPORTED_ACTION_PATTERN.test(lower)) {
-      const text =
-        "I don't actually have that capability yet — no PDF/DOCX/ZIP generation, no download links, no server-wide \"scan\" action. I can read and list real files (say \"help\" for exact commands), but I won't pretend to do more than that.";
-      this.memory.addMessage('assistant', text);
-      return { type: 'response', text };
-    }
 
     if (lower === 'status') {
       return {
@@ -311,37 +326,55 @@ class CommandProcessor {
     }
 
     /*
-     * Hermes tool routing.
+     * Sophie agent controller.
      *
-     * Protected self-upgrade and self-inspection branches above
-     * remain exclusively handled by Sophie.
+     * Protected self-upgrade and self-inspection branches above remain
+     * exclusively handled by Sophie. Real execution is delegated to Hermes.
      */
     try {
-      const toolResult = await routeTool(command, {
+      const mode = this.modeManager.getMode();
+      const memoryFacts = this.memory.getFacts();
+      const conversation = this.memory.getRecentMessages(21).slice(0, -1);
+
+      const agentResult = await routeAgent({
+        command,
         intent,
-        signal: options.signal,
-        onEvent: options.onEvent
+        mode,
+        memoryFacts,
+        conversation,
+        options: {
+          signal: options.signal,
+          onEvent: options.onEvent
+        }
       });
 
-      if (toolResult?.handled) {
-        const response = toolResult.response;
+      if (agentResult?.handled) {
+        const response = agentResult.response;
 
         this.memory.addMessage('assistant', response);
 
-        console.log(`[TOOL] ${toolResult.tool} handled the request.`);
+        console.log('[AGENT] Hermes completed the delegated task.');
 
         return {
           type: 'response',
           text: response,
-          tool: toolResult.tool,
-          sessionId: toolResult.sessionId || null
+          tool: agentResult.tool,
+          sessionId: agentResult.sessionId || null,
+          continuationCount: agentResult.continuationCount || 0,
+          artifacts: agentResult.artifacts || [],
+          mode
         };
       }
     } catch (error) {
-      console.error('[TOOL] Hermes error:', error);
+      console.error('[AGENT] Hermes error:', error);
+
+      if (error?.code === 'HERMES_CANCELLED') {
+        throw error;
+      }
 
       const text =
-        'I tried to use my external agent capability, but it is unavailable right now.';
+        'I could not complete that action through my execution engine. ' +
+        'Nothing is being claimed as completed unless the tool actually succeeded.';
 
       this.memory.addMessage('assistant', text);
 
@@ -415,7 +448,7 @@ class CommandProcessor {
 
       this.memory.addMessage('assistant', response);
 
-      return { type: 'response', text: response };
+      return { type: 'response', text: response, mode: this.modeManager.getMode() };
 
     } catch (error) {
       console.error('AI error:', error);
