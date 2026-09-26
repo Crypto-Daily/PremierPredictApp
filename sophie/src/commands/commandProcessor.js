@@ -7,6 +7,7 @@ const { getCurrentTimeContext } = require('../core/time');
 const { performWebResearch } = require('../research/webSearch');
 const { fetchAndSummarizeUrl } = require('../research/urlFetch');
 const { planAndApplyUpgrade } = require('../core/selfUpgradePlanner');
+const { ModeManager } = require('../core/modeManager');
 const {
   listProjectFiles,
   readProjectFile,
