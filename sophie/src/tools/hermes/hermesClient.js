@@ -13,15 +13,24 @@ const DEFAULT_TOOLSETS = process.env.HERMES_TOOLSETS || 'hermes-cli';
 function buildHermesEnv() {
   const env = { ...process.env };
 
-  delete env.SOPHIE_ADMIN_PASSCODE;
+  /*
+   * Hermes is an execution engine and may legitimately need its own
+   * provider credentials (FAL, OpenAI, browser, web, etc.). Do not
+   * blanket-strip credential-shaped variables or those capabilities
+   * silently disappear.
+   *
+   * Keep Sophie's most sensitive application secrets out of the child.
+   * Hermes also has its own ~/.hermes credential/config boundary.
+   */
+  const blocked = new Set([
+    'SOPHIE_ADMIN_PASSCODE',
+    'PAYSTACK_SECRET_KEY',
+    'MONGO_URI',
+    'DATABASE_URL'
+  ]);
 
-  for (const key of Object.keys(env)) {
-    if (
-      /(_KEY|_TOKEN|_SECRET|_PASSWORD|_PASSCODE)$/i.test(key) ||
-      /^(API_KEY|AUTH_TOKEN|ACCESS_TOKEN)$/i.test(key)
-    ) {
-      delete env[key];
-    }
+  for (const key of blocked) {
+    delete env[key];
   }
 
   return env;
