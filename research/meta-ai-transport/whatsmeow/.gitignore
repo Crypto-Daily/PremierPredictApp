@@ -2,3 +2,6 @@ wametaai
 wametaai.db*
 *.log
 .claude/
+
+# Generated Meta AI media
+media/

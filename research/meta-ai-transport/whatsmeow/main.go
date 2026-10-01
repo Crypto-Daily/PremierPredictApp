@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -120,11 +121,48 @@ type collector struct {
 	imageMIME   string
 	imageWidth  int
 	imageHeight int
+	imagePath   string
+	imageName   string
 	bump        chan struct{}
 }
 
 func newCollector() *collector {
 	return &collector{texts: map[string]string{}, bump: make(chan struct{}, 64)}
+}
+
+func (c *collector) putImage(url, mime string, width, height int) {
+	c.mu.Lock()
+	c.imageURL = url
+	c.imageMIME = mime
+	c.imageWidth = width
+	c.imageHeight = height
+	c.mu.Unlock()
+
+	select {
+	case c.bump <- struct{}{}:
+	default:
+	}
+}
+
+func (c *collector) setImageFile(filePath, name string) {
+	c.mu.Lock()
+	c.imagePath = filePath
+	c.imageName = name
+	c.mu.Unlock()
+}
+
+func (c *collector) hasImage() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.imagePath != "" || c.imageURL != ""
+}
+
+func (c *collector) image() (string, string, string, int, int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.imagePath, c.imageName, c.imageMIME, c.imageWidth, c.imageHeight
 }
 
 func (c *collector) put(id, text string) {
@@ -165,10 +203,12 @@ func (c *collector) wait() string {
 		case <-time.After(quietTime):
 			v := c.value()
 			trunc := looksTruncated(v)
+			hasImage := c.hasImage()
 			if debug {
-				log.Printf("~~ quiet elapsed len=%d truncated=%v grace=%v", len(v), trunc, grace != nil)
+				log.Printf("~~ quiet elapsed len=%d truncated=%v image=%v grace=%v",
+					len(v), trunc, hasImage, grace != nil)
 			}
-			if !trunc {
+			if !trunc || hasImage {
 				return v
 			}
 			if grace == nil {
@@ -213,6 +253,74 @@ type bridge struct {
 	activeM sync.RWMutex
 }
 
+func downloadMetaAIImage(ctx context.Context, imageURL, mime string) (string, string, error) {
+	if imageURL == "" {
+		return "", "", fmt.Errorf("empty Meta AI image URL")
+	}
+
+	dir := firstNonEmpty(
+		os.Getenv("SOPHIE_META_AI_IMAGE_DIR"),
+		"/home/ubuntu/sophie/integrations/meta-ai/whatsmeow/media",
+	)
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", "", fmt.Errorf("create image directory: %w", err)
+	}
+
+	ext := ".webp"
+	lowerMIME := strings.ToLower(mime)
+
+	if strings.Contains(lowerMIME, "jpeg") || strings.Contains(lowerMIME, "jpg") {
+		ext = ".jpg"
+	} else if strings.Contains(lowerMIME, "png") {
+		ext = ".png"
+	}
+
+	name := fmt.Sprintf("meta-ai-%d%s", time.Now().UnixNano(), ext)
+	dstPath := path.Join(dir, name)
+
+	downloadCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, imageURL, nil)
+	if err != nil {
+		return "", "", fmt.Errorf("create image request: %w", err)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", fmt.Errorf("download Meta AI image: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", "", fmt.Errorf("Meta AI image download returned HTTP %s", resp.Status)
+	}
+
+	f, err := os.Create(dstPath)
+	if err != nil {
+		return "", "", fmt.Errorf("create image file: %w", err)
+	}
+
+	_, copyErr := io.Copy(f, resp.Body)
+	closeErr := f.Close()
+
+	if copyErr != nil {
+		os.Remove(dstPath)
+		return "", "", fmt.Errorf("save Meta AI image: %w", copyErr)
+	}
+
+	if closeErr != nil {
+		os.Remove(dstPath)
+		return "", "", fmt.Errorf("close Meta AI image: %w", closeErr)
+	}
+
+	log.Printf("~~ IMAGE SAVED path=%s mime=%s", dstPath, mime)
+
+	return dstPath, name, nil
+}
+
 func (b *bridge) handle(raw any) {
 	msg, ok := raw.(*events.Message)
 	if !ok {
@@ -227,19 +335,38 @@ func (b *bridge) handle(raw any) {
 		return
 	}
 	id, text := extractReply(msg.Message, msg.Info.ID)
+
 	imageURL, imageMIME, imageWidth, imageHeight := extractMetaAIImageURL(msg.Message)
 	if imageURL != "" {
-		log.Printf("~~ IMAGE FOUND url=%s mime=%s width=%d height=%d", imageURL, imageMIME, imageWidth, imageHeight)
+		log.Printf("~~ IMAGE FOUND url=%s mime=%s width=%d height=%d",
+			imageURL, imageMIME, imageWidth, imageHeight)
 	}
+
 	captureMetaAIPayload(msg.Message, msg.Info.ID)
-	if text == "" {
-		return
-	}
+
 	b.activeM.RLock()
 	c := b.active
 	b.activeM.RUnlock()
+
 	if c != nil {
-		c.put(id, text)
+		if imageURL != "" {
+			c.putImage(imageURL, imageMIME, imageWidth, imageHeight)
+
+			imagePath, imageName, err := downloadMetaAIImage(
+				context.Background(),
+				imageURL,
+				imageMIME,
+			)
+			if err != nil {
+				log.Printf("!! IMAGE DOWNLOAD FAILED: %v", err)
+			} else {
+				c.setImageFile(imagePath, imageName)
+			}
+		}
+
+		if text != "" {
+			c.put(id, text)
+		}
 	}
 }
 
@@ -331,7 +458,7 @@ func extractReply(m *waE2E.Message, fallbackID string) (id string, text string) 
 	return id, ""
 }
 
-func (b *bridge) ask(ctx context.Context, prompt string) (string, error) {
+func (b *bridge) ask(ctx context.Context, prompt string) (string, string, string, int, int, error) {
 	b.sendMu.Lock()
 	defer b.sendMu.Unlock()
 
@@ -347,13 +474,19 @@ func (b *bridge) ask(ctx context.Context, prompt string) (string, error) {
 
 	_, err := b.client.SendMessage(ctx, botJID, &waE2E.Message{Conversation: proto.String(prompt)})
 	if err != nil {
-		return "", fmt.Errorf("send to %s: %w", botJID, err)
+		return "", "", "", 0, 0, fmt.Errorf("send to %s: %w", botJID, err)
 	}
 	reply := c.wait()
-	if reply == "" {
-		return "", fmt.Errorf("no reply from %s within %s", botJID, hardLimit)
+
+	imagePath, imageName, imageMIME, imageWidth, imageHeight := c.image()
+
+	if reply == "" && imagePath == "" {
+		return "", "", "", 0, 0, fmt.Errorf("no reply from %s within %s", botJID, hardLimit)
 	}
-	return reply, nil
+
+	_ = imageName
+
+	return reply, imagePath, imageMIME, imageWidth, imageHeight, nil
 }
 
 type toolCall struct {
@@ -713,6 +846,39 @@ func betweenFences(s string) string {
 
 func tokens(s string) int { return (len(s) + 3) / 4 }
 
+func serveMetaAIImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	name := path.Base(strings.TrimPrefix(r.URL.Path, "/v1/media/"))
+	if name == "." || name == "/" || name == "" || name != path.Base(name) {
+		http.Error(w, "invalid media name", http.StatusBadRequest)
+		return
+	}
+
+	dir := firstNonEmpty(
+		os.Getenv("SOPHIE_META_AI_IMAGE_DIR"),
+		"/home/ubuntu/sophie/integrations/meta-ai/whatsmeow/media",
+	)
+
+	filePath := path.Join(dir, name)
+
+	if _, err := os.Stat(filePath); err != nil {
+		if os.IsNotExist(err) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "media lookup failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	http.ServeFile(w, r, filePath)
+}
+
 func (b *bridge) serveChat(w http.ResponseWriter, r *http.Request) {
 	var req chatReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -725,7 +891,7 @@ func (b *bridge) serveChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("-> %s", strings.ReplaceAll(prompt, "\n", " | "))
-	reply, err := b.ask(r.Context(), prompt)
+	reply, imagePath, imageMIME, imageWidth, imageHeight, err := b.ask(r.Context(), prompt)
 	if err != nil {
 		log.Printf("!! %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -747,7 +913,7 @@ func (b *bridge) serveChat(w http.ResponseWriter, r *http.Request) {
 		}
 		if isCall && unrequestedDeletion(req.Messages, name, args) {
 			log.Printf("== refused unrequested deletion: %s", args)
-			if retry, rerr := b.ask(r.Context(), prompt+keepFilesInstruction); rerr == nil && retry != "" {
+			if retry, _, _, _, _, rerr := b.ask(r.Context(), prompt+keepFilesInstruction); rerr == nil && retry != "" {
 				reply = stripToolJSON(retry)
 			} else {
 				reply = "Created and verified the file."
@@ -760,7 +926,7 @@ func (b *bridge) serveChat(w http.ResponseWriter, r *http.Request) {
 		// terminates with whatever text it produced.
 		if isCall && priorCallCount(req.Messages, name, args) > 0 {
 			log.Printf("== repeat of %s %s — forcing a final answer", name, args)
-			if retry, rerr := b.ask(r.Context(), prompt+stopToolsInstruction); rerr == nil && retry != "" {
+			if retry, _, _, _, _, rerr := b.ask(r.Context(), prompt+stopToolsInstruction); rerr == nil && retry != "" {
 				reply = retry
 				if n2, a2, ok2 := parseToolCall(retry); ok2 && priorCallCount(req.Messages, n2, a2) == 0 {
 					name, args, isCall = n2, a2, ok2
@@ -789,12 +955,28 @@ func (b *bridge) serveChat(w http.ResponseWriter, r *http.Request) {
 					"function": map[string]string{"name": name, "arguments": args}}}}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+
+		response := map[string]any{
 			"id": "chatcmpl-" + msgID(), "object": "chat.completion", "created": created, "model": modelID,
 			"choices": []any{map[string]any{"index": 0, "finish_reason": finish, "message": message}},
 			"usage": map[string]int{"prompt_tokens": tokens(prompt), "completion_tokens": tokens(reply),
 				"total_tokens": tokens(prompt) + tokens(reply)},
-		})
+		}
+
+		if imagePath != "" {
+			imageName := path.Base(imagePath)
+			response["images"] = []any{
+				map[string]any{
+					"url":       "/v1/media/" + imageName,
+					"path":      imagePath,
+					"mime_type": imageMIME,
+					"width":     imageWidth,
+					"height":    imageHeight,
+				},
+			}
+		}
+
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -867,6 +1049,7 @@ func main() {
 	}
 
 	http.HandleFunc("/v1/chat/completions", b.serveChat)
+	http.HandleFunc("/v1/media/", serveMetaAIImage)
 	http.HandleFunc("/v1/models", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"object": "list", "data": []any{

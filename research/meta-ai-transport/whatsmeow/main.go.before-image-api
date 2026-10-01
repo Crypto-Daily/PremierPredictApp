@@ -6,8 +6,8 @@
 package main
 
 import (
-	"encoding/base64"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -113,14 +113,14 @@ func envDuration(key string, defMillis int) time.Duration {
 // messages still concatenate in arrival order. The answer is complete once quietTime passes with
 // nothing new and the text no longer looks unfinished.
 type collector struct {
-        mu          sync.Mutex
-        order       []string
-        texts       map[string]string
-        imageURL    string
-        imageMIME   string
-        imageWidth  int
-        imageHeight int
-        bump        chan struct{}
+	mu          sync.Mutex
+	order       []string
+	texts       map[string]string
+	imageURL    string
+	imageMIME   string
+	imageWidth  int
+	imageHeight int
+	bump        chan struct{}
 }
 
 func newCollector() *collector {
@@ -907,65 +907,65 @@ func captureMetaAIPayload(m *waE2E.Message, id string) {
 }
 
 func extractMetaAIImageURL(m *waE2E.Message) (string, string, int, int) {
-        raw, err := protojson.Marshal(m)
-        if err != nil {
-                return "", "", 0, 0
-        }
+	raw, err := protojson.Marshal(m)
+	if err != nil {
+		return "", "", 0, 0
+	}
 
-        var root any
-        if err := json.Unmarshal(raw, &root); err != nil {
-                return "", "", 0, 0
-        }
+	var root any
+	if err := json.Unmarshal(raw, &root); err != nil {
+		return "", "", 0, 0
+	}
 
-        var walk func(any) (string, string, int, int)
-        walk = func(v any) (string, string, int, int) {
-                switch x := v.(type) {
-                case map[string]any:
-                        if data, ok := x["data"].(string); ok && data != "" {
-                                if decoded, err := base64.StdEncoding.DecodeString(data); err == nil {
-                                        var unified any
-                                        if err := json.Unmarshal(decoded, &unified); err == nil {
-                                                if url, mime, width, height := walk(unified); url != "" {
-                                                        return url, mime, width, height
-                                                }
-                                        }
-                                }
-                        }
+	var walk func(any) (string, string, int, int)
+	walk = func(v any) (string, string, int, int) {
+		switch x := v.(type) {
+		case map[string]any:
+			if data, ok := x["data"].(string); ok && data != "" {
+				if decoded, err := base64.StdEncoding.DecodeString(data); err == nil {
+					var unified any
+					if err := json.Unmarshal(decoded, &unified); err == nil {
+						if url, mime, width, height := walk(unified); url != "" {
+							return url, mime, width, height
+						}
+					}
+				}
+			}
 
-                        if media, ok := x["media"].(map[string]any); ok {
-                                url, _ := media["url"].(string)
-                                mime, _ := media["mime_type"].(string)
+			if media, ok := x["media"].(map[string]any); ok {
+				url, _ := media["url"].(string)
+				mime, _ := media["mime_type"].(string)
 
-                                width := 0
-                                height := 0
-                                if n, ok := media["width"].(float64); ok {
-                                        width = int(n)
-                                }
-                                if n, ok := media["height"].(float64); ok {
-                                        height = int(n)
-                                }
+				width := 0
+				height := 0
+				if n, ok := media["width"].(float64); ok {
+					width = int(n)
+				}
+				if n, ok := media["height"].(float64); ok {
+					height = int(n)
+				}
 
-                                if url != "" {
-                                        return url, mime, width, height
-                                }
-                        }
+				if url != "" {
+					return url, mime, width, height
+				}
+			}
 
-                        for _, child := range x {
-                                if url, mime, width, height := walk(child); url != "" {
-                                        return url, mime, width, height
-                                }
-                        }
+			for _, child := range x {
+				if url, mime, width, height := walk(child); url != "" {
+					return url, mime, width, height
+				}
+			}
 
-                case []any:
-                        for _, child := range x {
-                                if url, mime, width, height := walk(child); url != "" {
-                                        return url, mime, width, height
-                                }
-                        }
-                }
+		case []any:
+			for _, child := range x {
+				if url, mime, width, height := walk(child); url != "" {
+					return url, mime, width, height
+				}
+			}
+		}
 
-                return "", "", 0, 0
-        }
+		return "", "", 0, 0
+	}
 
-        return walk(root)
+	return walk(root)
 }
