@@ -1,0 +1,5 @@
+name: meta-whatsapp
+version: 1.0.0
+description: Meta AI image generation through the local Sophie whatsmeow WhatsApp bridge
+author: Sophie
+kind: backend
