@@ -7,6 +7,10 @@ const {
   sanitizeExternalContent
 } = require('../src/nexus/policy');
 const { compactContext } = require('../src/nexus/context');
+const { buildToolPlan } = require('../src/nexus/toolRouter');
+const { executeLoop } = require('../src/nexus/executionLoop');
+const { listTools } = require('../src/tools');
+
 const { determinePlan, verifyResponse } = {
   determinePlan: require('../src/nexus/orchestrator').determinePlan,
   verifyResponse: require('../src/nexus/verification').verifyResponse
@@ -39,5 +43,24 @@ assert.strictEqual(verifyResponse({
   evidence:['source'],
   requirements:['completed']
 }).ok, true);
+
+const toolMetadata = listTools();
+assert.ok(toolMetadata.some(t => t.name === 'ask_hermes' && t.risk === 'high'));
+assert.ok(toolMetadata.some(t => t.name === 'nexus_plan' && t.risk === 'low'));
+
+const toolPlan = buildToolPlan({ intent: 'WEB_RESEARCH', mode: 'GPT', command: 'research this topic' });
+assert.ok(toolPlan.selectedTools.some(t => t.name === 'ask_hermes'));
+
+let attempts = 0;
+const loop = await executeLoop({
+  plan: toolPlan,
+  maxIterations: 2,
+  execute: async () => ({ ok: true, response: ++attempts === 1 ? '' : 'verified result' }),
+  observe: async ({ state }) => ({ response: state.execution.response, executionOk: state.execution.ok }),
+  verify: async ({ state }) => ({ ok: Boolean(state.observation.response) && state.observation.executionOk === true }),
+  correct: async () => ({ retry: true })
+});
+assert.strictEqual(loop.ok, true);
+assert.strictEqual(loop.iterations, 2);
 
 console.log('NEXUS core tests passed.');

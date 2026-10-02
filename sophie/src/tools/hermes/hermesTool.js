@@ -4,42 +4,21 @@ const { askHermes } = require('./hermesClient');
 
 const hermesTool = {
   name: 'ask_hermes',
-
-  description:
-    'Delegate a task to the locally installed Hermes Agent. Hermes may use its own configured tools and skills.',
+  description: 'Delegate a task to the locally installed Hermes Agent. Hermes may use its own configured tools and skills.',
+  capabilities: ['agent_execution', 'web', 'terminal', 'filesystem', 'computer', 'mcp'],
+  risk: 'high',
 
   async execute(input, options = {}) {
-    const query =
-      typeof input === 'string'
-        ? input
-        : input?.query;
+    const query = typeof input === 'string' ? input : input?.query;
+    if (!query || !query.trim()) throw new Error('ask_hermes requires a query.');
 
-    if (!query || !query.trim()) {
-      throw new Error('ask_hermes requires a query.');
-    }
-
-    const hermesOptions = {
-      cwd: options.cwd
-    };
-
-    if (options.timeoutMs) {
-      hermesOptions.timeoutMs = options.timeoutMs;
-    }
-
-    if (options.maxContinuations !== undefined) {
-      hermesOptions.maxContinuations = options.maxContinuations;
-    }
-
-    if (options.signal) {
-      hermesOptions.signal = options.signal;
-    }
-
-    if (options.onEvent) {
-      hermesOptions.onEvent = options.onEvent;
-    }
+    const hermesOptions = { cwd: options.cwd };
+    if (options.timeoutMs) hermesOptions.timeoutMs = options.timeoutMs;
+    if (options.maxContinuations !== undefined) hermesOptions.maxContinuations = options.maxContinuations;
+    if (options.signal) hermesOptions.signal = options.signal;
+    if (options.onEvent) hermesOptions.onEvent = options.onEvent;
 
     const result = await askHermes(query, hermesOptions);
-
     return {
       ok: true,
       tool: 'ask_hermes',

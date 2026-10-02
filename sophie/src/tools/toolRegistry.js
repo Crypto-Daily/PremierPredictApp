@@ -3,40 +3,38 @@
 const tools = new Map();
 
 function registerTool(tool) {
-  if (!tool || typeof tool.name !== 'string') {
-    throw new Error('Invalid tool: name is required.');
-  }
+  if (!tool || typeof tool.name !== 'string') throw new Error('Invalid tool: name is required.');
+  if (typeof tool.execute !== 'function') throw new Error(`Invalid tool "${tool.name}": execute() is required.`);
+  if (tools.has(tool.name)) throw new Error(`Tool already registered: ${tool.name}`);
 
-  if (typeof tool.execute !== 'function') {
-    throw new Error(
-      `Invalid tool "${tool.name}": execute() is required.`
-    );
-  }
-
-  if (tools.has(tool.name)) {
-    throw new Error(
-      `Tool already registered: ${tool.name}`
-    );
-  }
-
-  tools.set(tool.name, tool);
-
+  tools.set(tool.name, {
+    ...tool,
+    capabilities: Array.isArray(tool.capabilities) ? tool.capabilities : [tool.name],
+    risk: tool.risk || 'medium'
+  });
   return tool;
 }
 
-function getTool(name) {
-  return tools.get(name) || null;
-}
+function getTool(name) { return tools.get(name) || null; }
 
 function listTools() {
   return [...tools.values()].map(tool => ({
     name: tool.name,
-    description: tool.description || ''
+    description: tool.description || '',
+    capabilities: tool.capabilities,
+    risk: tool.risk
   }));
 }
 
-module.exports = {
-  registerTool,
-  getTool,
-  listTools
-};
+function describeTool(name) {
+  const tool = getTool(name);
+  if (!tool) return null;
+  return {
+    name: tool.name,
+    description: tool.description || '',
+    capabilities: tool.capabilities,
+    risk: tool.risk
+  };
+}
+
+module.exports = { registerTool, getTool, listTools, describeTool };
