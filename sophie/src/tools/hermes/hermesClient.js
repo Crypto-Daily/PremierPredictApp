@@ -8,10 +8,17 @@ const HERMES_BIN =
 const DEFAULT_TIMEOUT_MS = 600000;
 const DEFAULT_MAX_CONTINUATIONS = 1;
 const MAX_OUTPUT_CHARS = 500000;
-const DEFAULT_TOOLSETS = process.env.HERMES_TOOLSETS || 'hermes-cli';
+const DEFAULT_HERMES_HOME = '/home/ubuntu/.hermes';
+const DEFAULT_TOOLSETS = process.env.HERMES_TOOLSETS || 'hermes-cli,image_gen';
 
 function buildHermesEnv() {
   const env = { ...process.env };
+
+  // Sophie must invoke the same persistent Hermes profile that was configured
+  // for image generation. PM2 may carry a stale/alternate HERMES_HOME, which
+  // would make the child see a different config and plugin registry.
+  env.HERMES_HOME = process.env.SOPHIE_HERMES_HOME || DEFAULT_HERMES_HOME;
+  env.HERMES_TOOLSETS = process.env.HERMES_TOOLSETS || DEFAULT_TOOLSETS;
 
   /*
    * Hermes is an execution engine and may legitimately need its own
