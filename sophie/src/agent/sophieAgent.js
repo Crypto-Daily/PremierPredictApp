@@ -6,6 +6,9 @@ const { snapshot, diff } = require('../core/artifactManager');
 const { prepareRequest } = require('../nexus/orchestrator');
 const { buildToolPlan } = require('../nexus/toolRouter');
 const { executeLoop } = require('../nexus/executionLoop');
+const { createAutonomousTask } = require('../nexus/autonomy');
+const { authorizeAutonomousAction } = require('../nexus/approvalGate');
+const { recover } = require('../nexus/recovery');
 
 function buildHermesTask({ command, mode, intent, memoryFacts = [], conversation = [], research = [], timeContext = null }) {
   const nexus = prepareRequest({ command, intent, mode, memoryFacts, conversation, research, timeContext });
@@ -41,6 +44,13 @@ async function executeWithHermes({ command, mode, intent, memoryFacts, conversat
   if (!tool) throw new Error('Hermes execution tool is not registered.');
 
   const before = snapshot();
+  const taskState = createAutonomousTask({ command, intent, mode });
+  const approval = authorizeAutonomousAction({ capability: mode === 'JARVIS' ? 'agent_execution' : 'computer', mode, command });
+  if (!approval.allowed && intent === 'DEVICE_CONTROL') {
+    const error = new Error(approval.reason);
+    error.code = 'NEXUS_APPROVAL_REQUIRED';
+    throw error;
+  }
   const query = buildHermesTask({
     command, mode, intent, memoryFacts, conversation,
     timeContext: options.timeContext,
@@ -49,6 +59,7 @@ async function executeWithHermes({ command, mode, intent, memoryFacts, conversat
 
   const execution = await executeLoop({
     plan: buildToolPlan({ command, intent, mode }),
+    taskState,
     maxIterations: options.maxIterations || 2,
     onStep: step => options.onEvent?.({ type: 'nexus_step', ...step }),
     execute: async ({ iteration }) => tool.execute({ query: iteration === 1 ? query : query + '\n\nPrevious attempt did not pass verification. Re-check the objective and correct any incomplete work.' }, {
@@ -85,6 +96,7 @@ async function executeWithHermes({ command, mode, intent, memoryFacts, conversat
     const error = new Error('Hermes execution did not pass NEXUS verification.');
     error.code = 'NEXUS_VERIFICATION_FAILED';
     error.execution = execution;
+    error.recovery = recover({ verification: execution.state?.verification });
     throw error;
   }
 
