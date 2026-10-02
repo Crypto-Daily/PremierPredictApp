@@ -18,6 +18,9 @@ const { summarizeRun, deriveLessons } = require('../src/nexus/learning');
 const { synthesize } = require('../src/nexus/synthesis');
 const { requiredCapabilities, resolveCapabilityTools } = require('../src/nexus/capabilityRouter');
 const { classifyFile, summarizeTable } = require('../src/nexus/multimodal');
+const { decomposeTask, createAutonomousTask, advance } = require('../src/nexus/autonomy');
+const { requiresApproval, authorizeAutonomousAction } = require('../src/nexus/approvalGate');
+const { recover } = require('../src/nexus/recovery');
 const { listTools } = require('../src/tools');
 
 const { determinePlan, verifyResponse } = {
@@ -99,5 +102,16 @@ assert.strictEqual(classifyFile('data.csv'), 'document');
 assert.strictEqual(summarizeTable('name,score\\na,10\\nb,20').rows, 3);
 assert.ok(requiredCapabilities({ intent: 'CHAT', command: 'analyze this CSV dataset' }).includes('data'));
 assert.ok(resolveCapabilityTools({ intent: 'CHAT', command: 'analyze this CSV dataset' }).some(x => x.capability === 'data'));
+
+const plan = decomposeTask({ command: 'research this CSV and produce a report', intent: 'WEB_RESEARCH', mode: 'GPT' });
+assert.ok(plan.steps.some(step => step.id === 'research'));
+assert.ok(plan.steps.some(step => step.id === 'capability:data'));
+const autonomous = createAutonomousTask({ command: 'inspect project', intent: 'CHAT', mode: 'GPT' });
+assert.strictEqual(autonomous.status, 'planned');
+const advanced = advance(autonomous, 'understand');
+assert.strictEqual(advanced.status, 'running');
+assert.strictEqual(requiresApproval({ capability: 'computer', mode: 'GPT' }), true);
+assert.strictEqual(authorizeAutonomousAction({ capability: 'memory', mode: 'GPT' }).allowed, true);
+assert.strictEqual(recover({ error: new Error('permission denied') }).action, 'request_explicit_approval');
 
 console.log('NEXUS core tests passed.');
