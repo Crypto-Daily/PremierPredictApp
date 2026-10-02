@@ -124,4 +124,8 @@ const lineage = recordArtifact({ taskId: cp.id, artifact: { path: 'report.md', s
 assert.strictEqual(buildLineage([lineage])[0].parentId, 'root');
 removeTask(cp.id);
 
+const table = parseCsv('name,score\\na,10\\nb,20');
+assert.strictEqual(table.rows.length, 2);
+assert.strictEqual(analyzeCsv('name,score\\na,10\\nb,20').numeric[0].header, 'score');
+
 console.log('NEXUS core tests passed.');
