@@ -3,6 +3,7 @@
 const { verifyResponse } = require('./verification');
 
 async function executeLoop({
+  taskState = null,
   plan,
   execute,
   observe,
@@ -21,7 +22,7 @@ async function executeLoop({
     const result = await execute({ iteration, state, history });
 
     history.push({ phase: 'EXECUTE', iteration, result });
-    state = { ...state, execution: result, status: 'executed' };
+    state = { ...state, execution: result, status: 'executed', taskState: taskState ? { ...taskState, status: 'executed', iteration } : null };
 
     onStep({ phase: 'OBSERVE', iteration });
     const observation = typeof observe === 'function'
@@ -29,7 +30,7 @@ async function executeLoop({
       : result;
 
     history.push({ phase: 'OBSERVE', iteration, observation });
-    state = { ...state, observation, status: 'observed' };
+    state = { ...state, observation, status: 'observed', taskState: taskState ? { ...state.taskState, status: 'observed' } : state.taskState };
 
     onStep({ phase: 'VERIFY', iteration });
     const verification = typeof verify === 'function'
@@ -37,7 +38,7 @@ async function executeLoop({
       : verifyResponse({ text: observation?.text || observation, execution: result });
 
     history.push({ phase: 'VERIFY', iteration, verification });
-    state = { ...state, verification, status: verification.ok ? 'verified' : 'verification_failed' };
+    state = { ...state, verification, status: verification.ok ? 'verified' : 'verification_failed', taskState: taskState ? { ...state.taskState, status: verification.ok ? 'verified' : 'verification_failed' } : state.taskState };
 
     if (verification.ok) {
       return { ok: true, state, history, iterations: iteration };
