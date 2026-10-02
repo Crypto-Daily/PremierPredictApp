@@ -24,6 +24,7 @@ const { recover } = require('../src/nexus/recovery');
 const { saveTask, loadTask, checkpoint, removeTask } = require('../src/nexus/workspaceState');
 const { recordArtifact, buildLineage } = require('../src/nexus/artifactLineage');
 const { listTools } = require('../src/tools');
+const { validateArtifact } = require('../src/nexus/artifactWriter');
 
 const { determinePlan, verifyResponse } = {
   determinePlan: require('../src/nexus/orchestrator').determinePlan,
@@ -127,5 +128,8 @@ removeTask(cp.id);
 const table = parseCsv('name,score\\na,10\\nb,20');
 assert.strictEqual(table.rows.length, 2);
 assert.strictEqual(analyzeCsv('name,score\\na,10\\nb,20').numeric[0].header, 'score');
+
+assert.strictEqual(typeof validateArtifact, 'function');
+assert.throws(() => validateArtifact('../escape.txt'));
 
 console.log('NEXUS core tests passed.');
