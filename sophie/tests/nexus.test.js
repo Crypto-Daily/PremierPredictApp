@@ -21,6 +21,8 @@ const { classifyFile, summarizeTable } = require('../src/nexus/multimodal');
 const { decomposeTask, createAutonomousTask, advance } = require('../src/nexus/autonomy');
 const { requiresApproval, authorizeAutonomousAction } = require('../src/nexus/approvalGate');
 const { recover } = require('../src/nexus/recovery');
+const { saveTask, loadTask, checkpoint, removeTask } = require('../src/nexus/workspaceState');
+const { recordArtifact, buildLineage } = require('../src/nexus/artifactLineage');
 const { listTools } = require('../src/tools');
 
 const { determinePlan, verifyResponse } = {
@@ -113,5 +115,13 @@ assert.strictEqual(advanced.status, 'running');
 assert.strictEqual(requiresApproval({ capability: 'computer', mode: 'GPT' }), true);
 assert.strictEqual(authorizeAutonomousAction({ capability: 'memory', mode: 'GPT' }).allowed, true);
 assert.strictEqual(recover({ error: new Error('permission denied') }).action, 'request_explicit_approval');
+
+const persisted = saveTask({ id: 'phase7-test', objective: 'resume me', status: 'running', updatedAt: new Date().toISOString() });
+assert.strictEqual(loadTask(persisted.id).objective, 'resume me');
+const cp = checkpoint(persisted, 'before-execution', { nextStep: 'execute' });
+assert.strictEqual(loadTask(cp.id).checkpoint.label, 'before-execution');
+const lineage = recordArtifact({ taskId: cp.id, artifact: { path: 'report.md', size: 12, modifiedAt: new Date().toISOString() } });
+assert.strictEqual(buildLineage([lineage])[0].parentId, 'root');
+removeTask(cp.id);
 
 console.log('NEXUS core tests passed.');
