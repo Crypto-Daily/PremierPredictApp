@@ -162,24 +162,46 @@ function updateCommandStatus(requestId, patch = {}) {
   });
 }
 
+function recordCommandActivity(requestId, activity) {
+  const task = activeCommands.get(requestId);
+  if (!task || !activity) return;
+
+  const text = String(activity).replace(/\s+/g, ' ').trim();
+  if (!text) return;
+
+  if (!Array.isArray(task.activityLog)) task.activityLog = [];
+
+  const last = task.activityLog[task.activityLog.length - 1];
+  if (!last || last.text !== text) {
+    task.activityLog.push({
+      text,
+      at: Date.now()
+    });
+
+    if (task.activityLog.length > 30) {
+      task.activityLog = task.activityLog.slice(-30);
+    }
+  }
+
+  updateCommandStatus(requestId, { activity: text });
+}
+
 function summarizeHermesEvent(event) {
-  const tool = String(
-    event?.tool || event?.name || ''
-  ).toLowerCase();
+  const tool = String(event?.tool || event?.name || '').trim();
+  const message = String(
+    event?.message || event?.content || event?.text || ''
+  ).replace(/\s+/g, ' ').trim();
 
-  const map = {
-    read_file: 'Reading files…',
-    search_files: 'Searching files…',
-    terminal: 'Running terminal inspection…',
-    execute_code: 'Running code…',
-    write_file: 'Writing a file…',
-    browser: 'Using the browser…',
-    web_search: 'Searching the web…',
-    system: 'Starting Hermes…'
-  };
+  if (tool) {
+    return \`Hermes → \${tool}\${message && !message.toLowerCase().includes(tool.toLowerCase())
+      ? ': ' + message.slice(0, 180)
+      : ''}\`;
+  }
 
-  return map[tool] ||
-    (tool ? 'Hermes: ' + tool : null);
+  if (message) return \`Hermes: \${message.slice(0, 180)}\`;
+  if (event?.type) return \`Hermes → \${String(event.type)}\`;
+
+  return null;
 }
 
 const commandProcessor =
@@ -269,77 +291,35 @@ app.post('/api/mode', (req, res) => {
 
 
 
-app.post('/api/command', async (req, res) => {
-
-  console.log(
-    '[COMMAND] Request received'
-  );
+async function executeCommandInBackground(requestId, command, upgradeAuthorized, controller) {
+  const task = activeCommands.get(requestId);
+  if (!task) return;
 
   try {
+    recordCommandActivity(requestId, 'Delegating task to Hermes…');
 
-    const { command, requestId: suppliedRequestId } =
-      req.body;
-
-    const requestId =
-      typeof suppliedRequestId === 'string' &&
-      suppliedRequestId.trim()
-        ? suppliedRequestId.trim()
-        : randomUUID();
-
-    const controller = new AbortController();
-
-    activeCommands.set(requestId, {
-      controller,
-      status: 'working',
-      activity: 'Planning the task…',
-      startedAt: Date.now(),
-      updatedAt: Date.now()
+    const result = await commandProcessor.process(command, {
+      upgradeAuthorized,
+      signal: controller.signal,
+      onEvent: event => {
+        const activity = summarizeHermesEvent(event);
+        if (activity) recordCommandActivity(requestId, activity);
+      }
     });
 
-    const upgradeAuthorized = hasUpgradeSession(req);
-
-    if (
-      typeof command !== 'string'
-    ) {
-
-      return res.status(400).json({
-        error:
-          'command must be a string'
-      });
-
-    }
-
-    console.log(
-      `[COMMAND] Processing: ${command}`
-    );
-
-    const result =
-      await commandProcessor.process(
-        command,
-        {
-          upgradeAuthorized,
-          signal: controller.signal,
-          onEvent: event => {
-            const activity =
-              summarizeHermesEvent(event);
-
-            if (activity) {
-              updateCommandStatus(
-                requestId,
-                { activity }
-              );
-            }
-          }
-        }
-      );
+    const finishedAt = Date.now();
+    const durationMs = finishedAt - task.startedAt;
 
     updateCommandStatus(requestId, {
       status: 'complete',
-      activity: 'Completed.'
+      activity: 'Completed.',
+      result: { ...result, requestId },
+      durationMs,
+      finishedAt
     });
 
     console.log(
-      '[COMMAND] Response ready'
+      \`[COMMAND] Response ready requestId=\${requestId} duration=\${durationMs}ms\`
     );
 
     if (result && result.restartAfterResponse) {
@@ -353,69 +333,98 @@ app.post('/api/command', async (req, res) => {
         }
       }, 1500);
     }
+  } catch (error) {
+    const finishedAt = Date.now();
+    const durationMs = finishedAt - task.startedAt;
+    const status = error?.code === 'HERMES_CANCELLED' ? 'cancelled' : 'error';
 
-    if (!res.headersSent) {
-      res.json({
-        ...result,
-        requestId
+    updateCommandStatus(requestId, {
+      status,
+      activity: status === 'cancelled'
+        ? 'Stopped by you.'
+        : 'Request failed.',
+      error: {
+        code: error?.code || 'COMMAND_FAILED',
+        message: error?.message || 'The request failed.'
+      },
+      durationMs,
+      finishedAt
+    });
+
+    console.error('[COMMAND] ERROR:', error);
+  }
+}
+
+app.post('/api/command', async (req, res) => {
+  console.log('[COMMAND] Request received');
+
+  try {
+    const { command, requestId: suppliedRequestId } = req.body || {};
+
+    if (typeof command !== 'string' || !command.trim()) {
+      return res.status(400).json({
+        error: 'command must be a string'
       });
     }
-
-    setTimeout(
-      () => activeCommands.delete(requestId),
-      60000
-    );
-
-  } catch (error) {
 
     const requestId =
-      typeof req.body?.requestId === 'string'
-        ? req.body.requestId
-        : null;
+      typeof suppliedRequestId === 'string' && suppliedRequestId.trim()
+        ? suppliedRequestId.trim()
+        : randomUUID();
 
-    if (requestId) {
-      updateCommandStatus(requestId, {
-        status:
-          error?.code === 'HERMES_CANCELLED'
-            ? 'cancelled'
-            : 'error',
+    const controller = new AbortController();
+    const startedAt = Date.now();
 
-        activity:
-          error?.code === 'HERMES_CANCELLED'
-            ? 'Stopped by you.'
-            : 'Request failed.'
-      });
-    }
+    activeCommands.set(requestId, {
+      controller,
+      status: 'working',
+      activity: 'Request accepted.',
+      activityLog: [],
+      startedAt,
+      updatedAt: startedAt,
+      result: null,
+      error: null
+    });
 
-    console.error(
-      '[COMMAND] ERROR:',
-      error
+    const upgradeAuthorized = hasUpgradeSession(req);
+
+    recordCommandActivity(requestId, 'Request accepted.');
+
+    console.log(
+      \`[COMMAND] Processing requestId=\${requestId}: \${command}\`
     );
 
+    // Long-running Hermes work must not depend on the browser, proxy, or
+    // Cloudflare HTTP connection remaining open.
+    res.status(202).json({
+      accepted: true,
+      requestId,
+      status: 'working'
+    });
+
+    executeCommandInBackground(
+      requestId,
+      command,
+      upgradeAuthorized,
+      controller
+    ).catch(error => {
+      console.error('[COMMAND] Background execution crashed:', error);
+    });
+  } catch (error) {
+    console.error('[COMMAND] ENQUEUE ERROR:', error);
+
     if (!res.headersSent) {
-
       res.status(500).json({
-        error:
-          'Internal Sophie error'
+        error: 'Could not start the request.'
       });
-
     }
-
   }
-
 });
-
-/*
- * --------------------------------------------------
- * COMMAND STATUS / CANCEL
- * --------------------------------------------------
- */
 
 app.get(
   '/api/command/status/:requestId',
   (req, res) => {
-    const task =
-      activeCommands.get(req.params.requestId);
+    const task = activeCommands.get(req.params.requestId);
 
     if (!task) {
       return res.status(404).json({
@@ -427,8 +436,16 @@ app.get(
       requestId: req.params.requestId,
       status: task.status,
       activity: task.activity,
+      activityLog: task.activityLog || [],
       startedAt: task.startedAt,
-      updatedAt: task.updatedAt
+      updatedAt: task.updatedAt,
+      finishedAt: task.finishedAt || null,
+      durationMs: task.durationMs || null,
+      result: task.status === 'complete' ? task.result : null,
+      error:
+        task.status === 'error' || task.status === 'cancelled'
+          ? task.error
+          : null
     });
   }
 );
@@ -436,8 +453,7 @@ app.get(
 app.post(
   '/api/command/:requestId/cancel',
   (req, res) => {
-    const task =
-      activeCommands.get(req.params.requestId);
+    const task = activeCommands.get(req.params.requestId);
 
     if (!task) {
       return res.status(404).json({
@@ -445,20 +461,17 @@ app.post(
       });
     }
 
-    if (task.status !== 'working') {
+    if (task.status !== 'working' && task.status !== 'cancelling') {
       return res.json({
         ok: true,
         status: task.status
       });
     }
 
-    updateCommandStatus(
-      req.params.requestId,
-      {
-        status: 'cancelling',
-        activity: 'Stopping…'
-      }
-    );
+    updateCommandStatus(req.params.requestId, {
+      status: 'cancelling',
+      activity: 'Stopping…'
+    });
 
     task.controller.abort();
 
@@ -468,6 +481,7 @@ app.post(
     });
   }
 );
+
 
 /*
  * --------------------------------------------------
