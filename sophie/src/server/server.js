@@ -193,13 +193,13 @@ function summarizeHermesEvent(event) {
   ).replace(/\s+/g, ' ').trim();
 
   if (tool) {
-    return \`Hermes → \${tool}\${message && !message.toLowerCase().includes(tool.toLowerCase())
+    return `Hermes → ${tool}${message && !message.toLowerCase().includes(tool.toLowerCase())
       ? ': ' + message.slice(0, 180)
-      : ''}\`;
+      : ''}`;
   }
 
-  if (message) return \`Hermes: \${message.slice(0, 180)}\`;
-  if (event?.type) return \`Hermes → \${String(event.type)}\`;
+  if (message) return `Hermes: ${message.slice(0, 180)}`;
+  if (event?.type) return `Hermes → ${String(event.type)}`;
 
   return null;
 }
@@ -319,7 +319,7 @@ async function executeCommandInBackground(requestId, command, upgradeAuthorized,
     });
 
     console.log(
-      \`[COMMAND] Response ready requestId=\${requestId} duration=\${durationMs}ms\`
+      `[COMMAND] Response ready requestId=${requestId} duration=${durationMs}ms`
     );
 
     if (result && result.restartAfterResponse) {
@@ -394,7 +394,7 @@ app.post('/api/command', async (req, res) => {
     recordCommandActivity(requestId, 'Request accepted.');
 
     console.log(
-      \`[COMMAND] Processing requestId=\${requestId}: \${command}\`
+      `[COMMAND] Processing requestId=${requestId}: ${command}`
     );
 
     // Long-running Hermes work must not depend on the browser, proxy, or
