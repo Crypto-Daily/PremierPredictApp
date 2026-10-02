@@ -490,34 +490,110 @@
     .icon-svg { display: block; }
 
     .sophie-activity {
-      padding: 9px 12px;
-      margin: 6px 0;
-      border-radius: 10px;
-      background: rgba(255,255,255,0.05);
+      padding: 8px 12px;
+      margin: 8px 0 10px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.035);
       border: 1px solid rgba(255,255,255,0.08);
       font-size: 12px;
-      opacity: 0.95;
+      opacity: 0.9;
       max-width: 92%;
     }
 
     .sophie-activity-title {
-      display: inline;
+      display: block;
       font-weight: 600;
-      margin-right: 8px;
+      margin-bottom: 4px;
+      font-style: normal;
     }
 
     .sophie-activity-status {
-      display: inline;
+      display: block;
       opacity: 0.72;
-      min-height: 0;
+      min-height: 16px;
+      font-style: normal;
     }
 
-    .sophie-activity-time {
-      display: inline;
-      margin-left: 8px;
-      font-variant-numeric: tabular-nums;
-      opacity: 0.5;
+    .sophie-activity-log {
+      display: grid;
+      gap: 3px;
+      margin-top: 7px;
+      max-height: 92px;
+      overflow: hidden;
+      opacity: 0.55;
+    }
+
+    .sophie-activity-log div {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .worked-duration {
+      margin: -6px 0 12px 0;
+      color: var(--milk-muted);
       font-size: 11px;
+      opacity: 0.65;
+    }
+
+    .artifact-list {
+      margin: 10px 15% 14px 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .artifact-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--navy-line);
+      background: rgba(255,255,255,0.025);
+      border-radius: 12px;
+      text-decoration: none;
+      color: inherit;
+      min-width: 0;
+    }
+
+    .artifact-card:hover { background: rgba(255,255,255,0.05); }
+
+    .artifact-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 36px;
+      background: rgba(255,255,255,0.07);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .artifact-thumb {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 9px;
+      flex: 0 0 56px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .artifact-info { min-width: 0; }
+    .artifact-name {
+      font-size: 13px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .artifact-meta {
+      margin-top: 3px;
+      font-size: 11px;
+      color: var(--milk-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .typing-dots {
@@ -1572,51 +1648,60 @@ function showThinking() {
   div.className = 'message sophie thinking sophie-activity';
 
   div.innerHTML = `
-    <div class="sophie-activity-title">🟢 Sophie is working</div>
-    <div class="sophie-activity-status">Processing your request...</div>
-    <div class="sophie-activity-time">00:00</div>
+    <div class="sophie-activity-title">Sophie is working</div>
+    <div class="sophie-activity-status">Starting…</div>
+    <div class="sophie-activity-log"></div>
   `;
 
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
 
-  const statusElement = div.querySelector('.sophie-activity-status');
-  const timeElement = div.querySelector('.sophie-activity-time');
-
-  const statuses = [
-    'Understanding your request...',
-    'Planning the task...',
-    'Working with my tools...',
-    'Inspecting relevant information...',
-    'Processing results...'
-  ];
-
-  let statusIndex = 0;
-  let seconds = 0;
-
-  const statusTimer = setInterval(() => {
-    if (!document.body.contains(div)) return;
-    statusIndex = (statusIndex + 1) % statuses.length;
-    statusElement.textContent = statuses[statusIndex];
-  }, 2200);
-
-  const clockTimer = setInterval(() => {
-    if (!document.body.contains(div)) return;
-
-    seconds++;
-
-    const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
-    const secs = String(seconds % 60).padStart(2, '0');
-
-    timeElement.textContent = `${minutes}:${secs}`;
-  }, 1000);
-
-  div._cleanupActivity = () => {
-    clearInterval(statusTimer);
-    clearInterval(clockTimer);
-  };
-
   return div;
+}
+
+function finishThinking(thinkingElement, durationMs) {
+  if (!thinkingElement) return;
+
+  thinkingElement.remove();
+
+  if (Number.isFinite(durationMs) && durationMs >= 0) {
+    const worked = document.createElement('div');
+    worked.className = 'worked-duration';
+    worked.textContent = 'Worked for ' + formatDuration(durationMs);
+    messages.appendChild(worked);
+  }
+}
+
+function formatDuration(durationMs) {
+  const totalSeconds = Math.max(0, Math.round(Number(durationMs || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0) {
+    return minutes + 'm ' + seconds + 's';
+  }
+
+  return seconds + 's';
+}
+
+function updateThinkingActivity(thinkingElement, data) {
+  if (!thinkingElement || !document.body.contains(thinkingElement)) return;
+
+  const statusElement = thinkingElement.querySelector('.sophie-activity-status');
+  if (statusElement && data?.activity) {
+    statusElement.textContent = data.activity;
+  }
+
+  const logElement = thinkingElement.querySelector('.sophie-activity-log');
+  if (logElement && Array.isArray(data?.activityLog)) {
+    logElement.innerHTML = '';
+
+    data.activityLog.slice(-4).forEach(entry => {
+      const row = document.createElement('div');
+      row.textContent = entry.text || '';
+      logElement.appendChild(row);
+    });
+  }
 }
 
 function setEmptyState(isEmpty) {
@@ -1863,6 +1948,26 @@ async function cancelCurrentCommand() {
 }
 
 
+function artifactIcon(artifact) {
+  const mime = String(artifact?.mimeType || '').toLowerCase();
+  const ext = String(artifact?.path || '').split('.').pop().toLowerCase();
+
+  if (mime.startsWith('image/')) return null;
+  const icons = {
+    pdf: 'PDF', doc: 'W', docx: 'W', xls: 'X', xlsx: 'X',
+    ppt: 'P', pptx: 'P', csv: 'CSV', txt: 'TXT', md: 'MD',
+    json: '{}', zip: 'ZIP', mp3: '♪', wav: '♪', mp4: '▶', mov: '▶'
+  };
+  return icons[ext] || 'FILE';
+}
+
+function formatArtifactSize(bytes) {
+  const size = Number(bytes || 0);
+  if (size < 1024) return size + ' B';
+  if (size < 1024 * 1024) return Math.round(size / 1024) + ' KB';
+  return (size / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 function addArtifactLinks(artifacts) {
   if (!Array.isArray(artifacts) || artifacts.length === 0) return;
 
@@ -1870,18 +1975,55 @@ function addArtifactLinks(artifacts) {
   wrap.className = 'artifact-list';
 
   artifacts.forEach(artifact => {
+    if (!artifact?.path) return;
+
     const link = document.createElement('a');
-    link.className = 'artifact-link';
+    link.className = 'artifact-card';
     link.href = '/api/artifacts/download?path=' + encodeURIComponent(artifact.path);
     link.target = '_blank';
     link.rel = 'noopener';
-    link.textContent = '📎 ' + artifact.path;
+
+    const mime = String(artifact.mimeType || '').toLowerCase();
+    const isImage = mime.startsWith('image/');
+    const icon = artifactIcon(artifact);
+
+    if (isImage) {
+      const img = document.createElement('img');
+      img.className = 'artifact-thumb';
+      img.src = '/api/artifacts/download?path=' + encodeURIComponent(artifact.path);
+      img.alt = artifact.path.split('/').pop();
+      img.loading = 'lazy';
+      link.appendChild(img);
+    } else {
+      const badge = document.createElement('div');
+      badge.className = 'artifact-icon';
+      badge.textContent = icon || 'FILE';
+      link.appendChild(badge);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'artifact-info';
+
+    const name = document.createElement('div');
+    name.className = 'artifact-name';
+    name.textContent = artifact.path.split('/').pop();
+
+    const meta = document.createElement('div');
+    meta.className = 'artifact-meta';
+    meta.textContent = (artifact.mimeType || 'file') + ' · ' + formatArtifactSize(artifact.size);
+
+    info.appendChild(name);
+    info.appendChild(meta);
+    link.appendChild(info);
     wrap.appendChild(link);
   });
 
-  messages.appendChild(wrap);
-  messages.scrollTop = messages.scrollHeight;
+  if (wrap.children.length) {
+    messages.appendChild(wrap);
+    messages.scrollTop = messages.scrollHeight;
+  }
 }
+
 
 function createRequestId() {
   if (window.crypto && typeof window.crypto.randomUUID === 'function') {
@@ -1892,32 +2034,140 @@ function createRequestId() {
 }
 
 let activityPollTimer = null;
+let commandPollAbort = null;
+
+function rememberPendingRequest(requestId) {
+  if (requestId) localStorage.setItem('sophiePendingRequestId', requestId);
+}
+
+function forgetPendingRequest(requestId) {
+  const current = localStorage.getItem('sophiePendingRequestId');
+  if (!requestId || current === requestId) {
+    localStorage.removeItem('sophiePendingRequestId');
+  }
+}
 
 function startActivityPolling(requestId, thinkingElement) {
   if (activityPollTimer) clearInterval(activityPollTimer);
+  if (commandPollAbort) commandPollAbort.abort();
 
-  activityPollTimer = setInterval(async () => {
-    if (!document.body.contains(thinkingElement)) return;
+  commandPollAbort = new AbortController();
 
+  const poll = async () => {
     try {
       const response = await fetch('/api/command/status/' + encodeURIComponent(requestId), {
         cache: 'no-store',
-        credentials: 'same-origin'
+        credentials: 'same-origin',
+        signal: commandPollAbort.signal
       });
 
-      if (!response.ok) return;
+      if (!response.ok) {
+        return;
+      }
 
       const data = await response.json();
-      const statusElement = thinkingElement.querySelector('.sophie-activity-status');
-      if (statusElement && data.activity) statusElement.textContent = data.activity;
-    } catch {}
-  }, 700);
+      updateThinkingActivity(thinkingElement, data);
+
+      if (data.status === 'complete') {
+        await finishCommandFromStatus(data, thinkingElement);
+        return;
+      }
+
+      if (data.status === 'error' || data.status === 'cancelled') {
+        await finishCommandFromStatus(data, thinkingElement);
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.debug('[SOPHIE] Status poll temporarily unavailable:', error.message);
+      }
+    }
+  };
+
+  poll();
+  activityPollTimer = setInterval(poll, 800);
 }
 
 function stopActivityPolling() {
   if (activityPollTimer) {
     clearInterval(activityPollTimer);
     activityPollTimer = null;
+  }
+
+  if (commandPollAbort) {
+    commandPollAbort.abort();
+    commandPollAbort = null;
+  }
+}
+
+async function finishCommandFromStatus(data, thinkingElement) {
+  stopActivityPolling();
+  commandBusy = false;
+
+  const requestId = data.requestId || activeRequestId;
+  const durationMs = data.durationMs || (
+    data.startedAt ? Date.now() - data.startedAt : 0
+  );
+
+  finishThinking(thinkingElement, durationMs);
+
+  if (data.status === 'complete' && data.result) {
+    const result = data.result;
+
+    if (result.text) {
+      addMessage(result.text, 'sophie', '', result.requestId || null);
+      addArtifactLinks(result.artifacts);
+      maybeSpeak(result.text, window._activeVoiceRequest === requestId);
+    } else {
+      addMessage(JSON.stringify(result, null, 2), 'sophie');
+    }
+
+    await loadThreads();
+  } else if (data.status === 'cancelled') {
+    addMessage('Stopped.', 'sophie');
+  } else if (data.status === 'error') {
+    console.error('[SOPHIE] Command failed:', data.error);
+    addMessage(
+      'I could not complete that request. ' +
+      (data.error?.message || 'Please try again.'),
+      'sophie'
+    );
+  }
+
+  forgetPendingRequest(requestId);
+  activeRequestId = null;
+  updatePrimaryButton();
+}
+
+async function resumePendingRequest() {
+  const requestId = localStorage.getItem('sophiePendingRequestId');
+  if (!requestId) return;
+
+  try {
+    const response = await fetch('/api/command/status/' + encodeURIComponent(requestId), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+
+    if (!response.ok) {
+      forgetPendingRequest(requestId);
+      return;
+    }
+
+    const data = await response.json();
+    activeRequestId = requestId;
+    commandBusy = data.status === 'working' || data.status === 'cancelling';
+
+    const thinkingElement = showThinking();
+    updateThinkingActivity(thinkingElement, data);
+
+    if (data.status === 'complete' || data.status === 'error' || data.status === 'cancelled') {
+      await finishCommandFromStatus(data, thinkingElement);
+    } else {
+      startActivityPolling(requestId, thinkingElement);
+      updatePrimaryButton();
+    }
+  } catch (error) {
+    console.debug('[SOPHIE] Could not resume pending request:', error.message);
   }
 }
 
@@ -1932,8 +2182,10 @@ async function sendCommand(command, isVoice, displayText) {
   updatePrimaryButton();
 
   activeRequestId = createRequestId();
+  window._activeVoiceRequest = isVoice ? activeRequestId : null;
+  rememberPendingRequest(activeRequestId);
+
   const thinkingElement = showThinking();
-  startActivityPolling(activeRequestId, thinkingElement);
   updatePrimaryButton();
 
   try {
@@ -1948,36 +2200,36 @@ async function sendCommand(command, isVoice, displayText) {
     });
 
     let data;
-    try { data = await response.json(); } catch { throw new Error('Invalid response from Sophie.'); }
-
-    if (!response.ok) throw new Error(data.error || 'Command request failed.');
-
-    if (thinkingElement) {
-      if (thinkingElement._cleanupActivity) thinkingElement._cleanupActivity();
-      stopActivityPolling();
-      thinkingElement.remove();
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error('Sophie did not return a valid response.');
     }
 
-    if (data.text) {
-      addMessage(data.text, 'sophie', '', commandTrimmed);
-      addArtifactLinks(data.artifacts);
-      maybeSpeak(data.text, isVoice);
-    } else {
-      addMessage(JSON.stringify(data, null, 2), 'sophie');
+    if (!response.ok) {
+      throw new Error(data.error || 'Could not start the request.');
     }
 
-    await loadThreads();
+    if (!data.requestId) {
+      throw new Error('Sophie did not return a request id.');
+    }
 
+    activeRequestId = data.requestId;
+    rememberPendingRequest(activeRequestId);
+    startActivityPolling(activeRequestId, thinkingElement);
   } catch (error) {
-    if (thinkingElement) {
-      if (thinkingElement._cleanupActivity) thinkingElement._cleanupActivity();
-      thinkingElement.remove();
-    }
-    console.error('Command error:', error);
-    addMessage('I could not connect to my core. ' + error.message, 'sophie');
-  } finally {
-    commandBusy = false;
     stopActivityPolling();
+    finishThinking(thinkingElement, null);
+    commandBusy = false;
+
+    console.error('[SOPHIE] Command start error:', error);
+
+    addMessage(
+      'I could not start that request. ' + error.message,
+      'sophie'
+    );
+
+    forgetPendingRequest(activeRequestId);
     activeRequestId = null;
     updatePrimaryButton();
   }
@@ -2396,6 +2648,8 @@ async function init() {
   updatePrimaryButton();
 
   await loadThreads();
+
+  await resumePendingRequest();
 
   try {
     const response = await fetch('/api/threads/active', { cache: 'no-store' });
