@@ -16,6 +16,8 @@ const { sanitizeExternalContent } = require('../src/nexus/policy');
 const { createTaskState, transition } = require('../src/nexus/taskState');
 const { summarizeRun, deriveLessons } = require('../src/nexus/learning');
 const { synthesize } = require('../src/nexus/synthesis');
+const { requiredCapabilities, resolveCapabilityTools } = require('../src/nexus/capabilityRouter');
+const { classifyFile, summarizeTable } = require('../src/nexus/multimodal');
 const { listTools } = require('../src/tools');
 
 const { determinePlan, verifyResponse } = {
@@ -91,5 +93,11 @@ const lesson = deriveLessons([{ phase: 'VERIFY', iteration: 1, verification: { o
 assert.strictEqual(lesson.length, 1);
 assert.strictEqual(summarizeRun({ task, result: { ok: true, iterations: 1 } }).status, 'success');
 assert.strictEqual(synthesize({ responses: [{ provider: 'A', text: 'alpha beta', score: 1 }], evidence: ['source'] }).provider, 'A');
+
+assert.strictEqual(classifyFile('chart.png'), 'image');
+assert.strictEqual(classifyFile('data.csv'), 'document');
+assert.strictEqual(summarizeTable('name,score\\na,10\\nb,20').rows, 3);
+assert.ok(requiredCapabilities({ intent: 'CHAT', command: 'analyze this CSV dataset' }).includes('data'));
+assert.ok(resolveCapabilityTools({ intent: 'CHAT', command: 'analyze this CSV dataset' }).some(x => x.capability === 'data'));
 
 console.log('NEXUS core tests passed.');
