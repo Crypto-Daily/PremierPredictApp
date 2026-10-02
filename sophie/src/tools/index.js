@@ -9,6 +9,7 @@ const memoryTool = require('./memoryTool');
 const multimodalTool = require('./multimodalTool');
 const taskTool = require('./taskTool');
 const workbenchTool = require('./workbenchTool');
+const workflowTool = require('./workflowTool');
 
 registerTool(hermesTool);
 registerTool(nexusTool);
@@ -18,5 +19,6 @@ registerTool(memoryTool);
 registerTool(multimodalTool);
 registerTool(taskTool);
 registerTool(workbenchTool);
+registerTool(workflowTool);
 
 module.exports = { registerTool, getTool, listTools, describeTool };

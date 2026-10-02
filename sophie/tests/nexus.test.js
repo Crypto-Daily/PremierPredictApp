@@ -132,4 +132,11 @@ assert.strictEqual(analyzeCsv('name,score\\na,10\\nb,20').numeric[0].header, 'sc
 assert.strictEqual(typeof validateArtifact, 'function');
 assert.throws(() => validateArtifact('../escape.txt'));
 
+const workflow = composeWorkflow({ command: 'analyze this dataset and create a report', intent: 'CHAT', mode: 'GPT' });
+assert.ok(workflow.stages.some(s => s.id === 'analyze'));
+assert.ok(workflow.stages.some(s => s.id === 'produce'));
+const started = startWorkflow({ command: 'analyze this dataset', intent: 'CHAT', mode: 'GPT' });
+assert.strictEqual(started.status, 'running');
+assert.ok(verifyWorkflow({ response: 'analysis complete', requirements: ['analysis'] }).ok);
+
 console.log('NEXUS core tests passed.');
