@@ -7,6 +7,7 @@ const webSearchTool = require('./webSearchTool');
 const artifactTool = require('./artifactTool');
 const memoryTool = require('./memoryTool');
 const multimodalTool = require('./multimodalTool');
+const taskTool = require('./taskTool');
 
 registerTool(hermesTool);
 registerTool(nexusTool);
@@ -14,5 +15,6 @@ registerTool(webSearchTool);
 registerTool(artifactTool);
 registerTool(memoryTool);
 registerTool(multimodalTool);
+registerTool(taskTool);
 
 module.exports = { registerTool, getTool, listTools, describeTool };
