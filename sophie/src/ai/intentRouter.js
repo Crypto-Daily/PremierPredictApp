@@ -1,50 +1,31 @@
-const SELF_INSPECT_PATTERN = /\b(your (source code|architecture|own code)|what files make up|where is your|where'?s your|which file (handles|contains)|show me your (code|architecture|files)|list files in|list the files in|read file|show me the file|show me file|looking for.*(folder|file)|find.*(folder|file)|where is.*located|access (my|the).*folder)\b/i;
+'use strict';
 
-const EXPLICIT_SEARCH = /\b(search for|search the web|look up|google that|do some research)\b/i;
-
-const FRESHNESS_WORDS = /\b(latest|today|currently|current|recent(ly)?|this week|this month|breaking news)\b/i;
-
-const VISION_PATTERNS = /\b(analyze this image|look at this|what do you see|what is in this image|what's in this picture)\b/i;
-
-const MEMORY_PATTERN = /\bremember that\b/i;
-
-const CREATION_PATTERN = /^(please\s+|can you\s+|could you\s+)?(create|make|design|build)\b(?!\s+(sure|sense|it|a case|an argument))/i;
-
-const DEVICE_CONTROL_PATTERN = /\b(turn (on|off)|switch (on|off))\s+(the\s+)?\w+/i;
-const SELF_UPGRADE_PATTERN = /\b(upgrade yourself|modify your own code|change your own code|rewrite your code|improve your architecture|fix your source code|update your own files)\b/i;
+const PATTERNS = {
+  SELF_UPGRADE: /\b(upgrade yourself|modify your own code|change your own code|rewrite your code|improve your architecture|fix your source code|update your own files)\b/i,
+  SELF_INSPECT: /\b(your source code|your architecture|what files make up|where is your|which file (handles|contains)|show me your (code|architecture|files)|list files in|read file|show me the file|find.*(folder|file))\b/i,
+  WEB_RESEARCH: /\b(search for|search the web|look up|google that|research|investigate|latest|today|currently|current|recent|this week|this month|breaking news)\b/i,
+  VISION: /\b(analyze this image|look at this|what do you see|what is in this image|what's in this picture|inspect this screenshot)\b/i,
+  MEMORY: /\b(remember that|remember this|forget that)\b/i,
+  CREATION: /^\s*(please\s+|can you\s+|could you\s+)?(create|make|design|build|generate)\b/i,
+  DEVICE_CONTROL: /\b(turn (on|off)|switch (on|off)|control|connect|disconnect)\b.*\b(tv|phone|computer|screen|device|browser|monitor|speaker|camera)\b/i
+};
 
 function routeIntent(command) {
-  const text = command.trim();
-
-  if (SELF_UPGRADE_PATTERN.test(text)) return 'SELF_UPGRADE';
-
-  if (SELF_INSPECT_PATTERN.test(text)) {
-    return 'SELF_INSPECT';
+  const text = String(command || '').trim();
+  for (const [intent, pattern] of Object.entries(PATTERNS)) {
+    if (pattern.test(text)) return intent;
   }
-
-  if (EXPLICIT_SEARCH.test(text) || FRESHNESS_WORDS.test(text)) {
-    return 'WEB_RESEARCH';
-  }
-
-  if (VISION_PATTERNS.test(text)) {
-    return 'VISION';
-  }
-
-  if (MEMORY_PATTERN.test(text)) {
-    return 'MEMORY';
-  }
-
-  if (CREATION_PATTERN.test(text)) {
-    return 'CREATION';
-  }
-
-  if (DEVICE_CONTROL_PATTERN.test(text)) {
-    return 'DEVICE_CONTROL';
-  }
-
   return 'CHAT';
 }
 
-module.exports = {
-  routeIntent
-};
+function classifyComplexity(command) {
+  const text = String(command || '');
+  const score =
+    (text.length > 250 ? 1 : 0) +
+    ((text.match(/\b(and|then|after|before|also|finally)\b/gi) || []).length >= 2 ? 1 : 0) +
+    ((text.match(/\b(create|execute|research|inspect|debug|test|build|edit)\b/gi) || []).length >= 2 ? 1 : 0);
+
+  return score >= 2 ? 'complex' : score === 1 ? 'moderate' : 'simple';
+}
+
+module.exports = { routeIntent, classifyComplexity };

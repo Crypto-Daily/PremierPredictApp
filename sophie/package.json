@@ -1,17 +1,17 @@
 {
   "name": "sophie",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "src/server/server.js",
   "scripts": {
-    "test": "node tests/sophie.test.js",
+    "test": "node tests/sophie.test.js && node tests/nexus.test.js",
     "start": "node src/server/server.js",
     "dev": "nodemon src/server/server.js",
-    "check": "node --check src/server/server.js && node --check src/core/selfUpgrade.js"
+    "check": "node --check src/server/server.js && node --check src/core/selfUpgrade.js && node --check src/nexus/orchestrator.js && node --check src/nexus/policy.js && node --check src/nexus/context.js && node --check src/nexus/verification.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Sophie — NEXUS-OMEGA multimodal AI orchestrator and GPT-ARCHITECT execution layer",
   "dependencies": {
     "@google/genai": "^2.21.0",
     "cors": "^2.8.6",

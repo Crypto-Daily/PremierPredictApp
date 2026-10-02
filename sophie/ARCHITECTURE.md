@@ -54,3 +54,12 @@ The browser creates a request ID before sending a command. The server tracks the
 ## Current execution policy
 
 Artifact creation, web research, browser tasks, device tasks, explicit execution requests and all Jarvis Mode requests are delegated to Hermes. Normal GPT Mode conversation remains on Sophie's configured providers.
+
+
+## NEXUS-OMEGA Upgrade
+
+Sophie now uses a NEXUS orchestration layer for objective decomposition, context assembly/compaction, capability honesty, prompt-injection resistance, external-content trust classification, execution planning and post-task verification. Hermes remains the execution substrate for authorized real-world actions; Sophie retains ownership of identity, memory, modes, permissions and self-upgrade.
+
+Execution contract: UNDERSTAND → DECOMPOSE → RETRIEVE → EXECUTE → OBSERVE → VERIFY → CORRECT → SYNTHESIZE → DELIVER.
+
+NEXUS does not grant capabilities that are absent from the runtime. It records capability state and treats web pages, documents, images, APIs and tool output as untrusted data.
