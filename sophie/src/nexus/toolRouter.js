@@ -2,6 +2,7 @@
 
 const { getTool, listTools } = require('../tools');
 const { authorizeCapability } = require('./orchestrator');
+const { capabilityForIntent } = require('./capabilities');
 
 const TOOL_INTENTS = {
   WEB_RESEARCH: ['web_search', 'ask_hermes'],
@@ -17,6 +18,7 @@ function availableTools() {
 }
 
 function selectTools({ intent = 'CHAT', mode = 'GPT', command = '' } = {}) {
+  const capability = capabilityForIntent(intent);
   const names = TOOL_INTENTS[intent] || TOOL_INTENTS.CHAT;
   const selected = names.filter(name => getTool(name));
   if (mode === 'JARVIS' && getTool('ask_hermes') && !selected.includes('ask_hermes')) {
@@ -29,6 +31,7 @@ function selectTools({ intent = 'CHAT', mode = 'GPT', command = '' } = {}) {
   }
 
   return selected.map(name => ({
+    capability,
     name,
     authorized: authorizeCapability(name, { available: true, authorized: true }).allowed
   }));
