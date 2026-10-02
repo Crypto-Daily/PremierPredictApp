@@ -247,7 +247,7 @@ class CommandProcessor {
       console.log('[INTENT] Research override → CHAT for simple knowledge request');
     }
 
-    console.log(\`[INTENT] \${intent}\`);
+    console.log(`[INTENT] ${intent}`);
 
     if (intent === 'SELF_UPGRADE') {
       if (!upgradeAuthorized) {
