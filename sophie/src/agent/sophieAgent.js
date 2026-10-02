@@ -2,7 +2,9 @@
 
 const { shouldDelegateToHermes } = require('./agentPolicy');
 const { getTool } = require('../tools');
-const { snapshot, diff } = require('../core/artifactManager');
+const { snapshot, diff, WORKSPACE_ROOT } = require('../core/artifactManager');
+const fs = require('node:fs');
+const path = require('node:path');
 
 function buildHermesTask({ command, mode, intent, memoryFacts = [], conversation = [] }) {
   const memoryText = memoryFacts.length
@@ -28,7 +30,8 @@ function buildHermesTask({ command, mode, intent, memoryFacts = [], conversation
     '6. Never request, reveal, store, or use SOPHIE_ADMIN_PASSCODE.',
     "7. Do not modify Sophie source code, security controls, or self-upgrade files unless the request is explicitly routed through Sophie's protected self-upgrade system.",
     '8. Use your available browser, terminal, filesystem, image generation, skills, MCP and other configured tools when appropriate.',
-    '9. For multi-step tasks, plan internally, execute the steps, verify the result, then report the outcome and artifact paths.',
+    '9. For multi-step tasks, plan internally, execute the steps, verify the result, then report the outcome.',
+    '10. Never expose internal filesystem paths, bridge URLs, provider retry details, model fallback details, or implementation/debugging narration to the user. Describe the result naturally and let Sophie render verified artifacts separately.',
     '',
     'LONG-TERM MEMORY:',
     memoryText,
@@ -56,7 +59,52 @@ async function executeWithHermes({ command, mode, intent, memoryFacts, conversat
     onEvent: options.onEvent
   });
 
-  const artifacts = diff(before);
+  let artifacts = diff(before);
+
+  // Hermes image/file backends can place verified output outside Sophie's
+  // workspace (for example the Meta AI WhatsApp bridge). Promote those files
+  // into the canonical artifact workspace so the same artifact pipeline can
+  // render them inline and list them in Artifacts.
+  const discoveredPaths = new Set();
+  const responseText = String(result.response || '');
+  const pathPatterns = [
+    /(?:Image|File|Artifact) saved to:\s*(\/[^\n\r]+)/gi,
+    /(?:^|\s)(\/home\/ubuntu\/sophie\/[^\s]+\.(?:png|jpe?g|webp|gif|svg|pdf|docx?|xlsx?|pptx?|csv|txt|md|json|zip))(?:\s|$)/gi
+  ];
+
+  for (const pattern of pathPatterns) {
+    for (const match of responseText.matchAll(pattern)) {
+      const candidate = (match[1] || match[2] || '').trim().replace(/[.,;)]+$/, '');
+      if (candidate) discoveredPaths.add(candidate);
+    }
+  }
+
+  for (const sourcePath of discoveredPaths) {
+    try {
+      const stat = fs.statSync(sourcePath);
+      if (!stat.isFile()) continue;
+
+      const relative = path.relative(WORKSPACE_ROOT, sourcePath);
+      if (!relative.startsWith('..' + path.sep) && !path.isAbsolute(relative)) continue;
+
+      const destinationDir = path.join(WORKSPACE_ROOT, 'generated');
+      fs.mkdirSync(destinationDir, { recursive: true });
+
+      let destination = path.join(destinationDir, path.basename(sourcePath));
+      if (fs.existsSync(destination)) {
+        const ext = path.extname(destination);
+        const stem = path.basename(destination, ext);
+        destination = path.join(destinationDir, stem + '-' + Date.now() + ext);
+      }
+
+      fs.copyFileSync(sourcePath, destination);
+      console.log('[ARTIFACT] Promoted Hermes output:', destination);
+    } catch (error) {
+      console.warn('[ARTIFACT] Could not promote Hermes output:', sourcePath, error.message);
+    }
+  }
+
+  artifacts = diff(before);
 
   return {
     handled: true,
