@@ -352,6 +352,8 @@ async function executeCommandInBackground(requestId, command, upgradeAuthorized,
     });
 
     console.error('[COMMAND] ERROR:', error);
+  } finally {
+    setTimeout(() => activeCommands.delete(requestId), 6 * 60 * 60 * 1000);
   }
 }
 
@@ -383,7 +385,8 @@ app.post('/api/command', async (req, res) => {
       startedAt,
       updatedAt: startedAt,
       result: null,
-      error: null
+      error: null,
+      command
     });
 
     const upgradeAuthorized = hasUpgradeSession(req);
@@ -439,6 +442,7 @@ app.get(
       activityLog: task.activityLog || [],
       startedAt: task.startedAt,
       updatedAt: task.updatedAt,
+      command: task.command,
       finishedAt: task.finishedAt || null,
       durationMs: task.durationMs || null,
       result: task.status === 'complete' ? task.result : null,
