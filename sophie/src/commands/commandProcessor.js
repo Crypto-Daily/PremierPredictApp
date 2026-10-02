@@ -62,6 +62,21 @@ const PATH_ALIASES = {
 const os = require('os');
 const HOME_DIR = os.homedir();
 
+function isSimpleKnowledgeRequest(command) {
+  const text = String(command || '').trim();
+
+  // Basic arithmetic should never enter the web-research pipeline.
+  if (/^[\d\s()+\-*/%.^=]+$/.test(text)) return true;
+
+  // Ordinary definition/explanation questions are normal GPT chat unless the
+  // user explicitly asks for current/latest information.
+  if (/^(?:what|who|why|how|when|where)\s+(?:is|are|was|were|does|do|did|can|could|would|should)\b/i.test(text)) {
+    return !/\b(latest|today|currently|current|recent|this week|this month|breaking news|search|look up|research|google)\b/i.test(text);
+  }
+
+  return false;
+}
+
 function normalizePathArg(raw) {
   const cleaned = raw.trim().toLowerCase();
 
@@ -222,9 +237,17 @@ class CommandProcessor {
       return { type: 'response', text };
     }
 
-    const intent = routeIntent(command);
+    let intent = routeIntent(command);
 
-    console.log(`[INTENT] ${intent}`);
+    // Guard the normal GPT path against accidental research routing. Simple
+    // knowledge questions and arithmetic should be answered by the configured
+    // chat model directly, not by the research pipeline.
+    if (intent === 'WEB_RESEARCH' && isSimpleKnowledgeRequest(command)) {
+      intent = 'CHAT';
+      console.log('[INTENT] Research override → CHAT for simple knowledge request');
+    }
+
+    console.log(\`[INTENT] \${intent}\`);
 
     if (intent === 'SELF_UPGRADE') {
       if (!upgradeAuthorized) {
