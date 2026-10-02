@@ -65,6 +65,11 @@ const HOME_DIR = os.homedir();
 function isSimpleKnowledgeRequest(command) {
   const text = String(command || '').trim();
 
+  // Recent sports results require the live research path.
+  if (/\b(last|most recent|latest)\s+(match|game|fixture|result|score)\b|\b(last match|last game|most recent match|most recent game)\b/i.test(text)) {
+    return false;
+  }
+
   // Basic arithmetic should never enter the web-research pipeline.
   if (/^[\d\s()+\-*/%.^=]+$/.test(text)) return true;
 
