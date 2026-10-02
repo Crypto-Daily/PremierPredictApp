@@ -6,13 +6,15 @@ function verifyResponse({ text, evidence = [], execution = null, requirements = 
     nonEmpty: response.length > 0,
     requirementsCovered: requirements.every(r => response.toLowerCase().includes(String(r).toLowerCase())),
     executionHonest: !execution || execution.success !== false,
-    evidencePresentWhenRequired: evidence.length === 0 || evidence.some(Boolean)
+    evidencePresentWhenRequired: evidence.length === 0 || evidence.some(Boolean),
+    noPlaceholderCompletion: !/\b(done|completed|successfully)\b/i.test(response) || Boolean(execution?.success !== false)
   };
 
   return {
     ok: Object.values(checks).every(Boolean),
     checks,
     evidenceCount: evidence.length,
+    confidence: Object.values(checks).filter(Boolean).length / Object.keys(checks).length,
     verifiedAt: new Date().toISOString()
   };
 }
