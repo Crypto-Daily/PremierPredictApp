@@ -101,25 +101,21 @@ async function executeWithHermes({ command, mode, intent, memoryFacts, conversat
     onEvent: options.onEvent
   });
 
-  let artifacts = diff(before);
-
-  // Hermes image/file backends can place verified output outside Sophie's
-  // workspace (for example the Meta AI WhatsApp bridge). Promote those files
-  // into the canonical artifact workspace so the same artifact pipeline can
-  // render them inline and list them in Artifacts.
-  const discoveredPaths = new Set();
   const responseText = String(result.response || '');
+  const discoveredPaths = new Set();
   const pathPatterns = [
-    /(?:Image|File|Artifact) saved to:\s*(\/[^\n\r]+)/gi,
-    /(?:^|\s)(\/home\/ubuntu\/sophie\/[^\s]+\.(?:png|jpe?g|webp|gif|svg|pdf|docx?|xlsx?|pptx?|csv|txt|md|json|zip))(?:\s|$)/gi
+    /(?:Image|File|Artifact) saved to:\s*\`?([^\`\n\r]+)\`?/gi,
+    /((?:\/home\/ubuntu\/sophie)\/[^\s\`]+\.(?:png|jpe?g|webp|gif|svg|pdf|docx?|xlsx?|pptx?|csv|txt|md|json|zip))/gi
   ];
 
   for (const pattern of pathPatterns) {
     for (const match of responseText.matchAll(pattern)) {
-      const candidate = (match[1] || match[2] || '').trim().replace(/[.,;)]+$/, '');
+      const candidate = (match[1] || '').trim().replace(/[.,;)]+$/, '');
       if (candidate) discoveredPaths.add(candidate);
     }
   }
+
+  const promotedArtifacts = [];
 
   for (const sourcePath of discoveredPaths) {
     try {
@@ -140,18 +136,47 @@ async function executeWithHermes({ command, mode, intent, memoryFacts, conversat
       }
 
       fs.copyFileSync(sourcePath, destination);
+
+      const relativeArtifact = path.relative(WORKSPACE_ROOT, destination).split(path.sep).join('/');
+      const destinationStat = fs.statSync(destination);
+      const ext = path.extname(destination).toLowerCase();
+      const mimeTypes = {
+        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml',
+        '.pdf': 'application/pdf', '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xls': 'application/vnd.ms-excel',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.ppt': 'application/vnd.ms-powerpoint',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        '.csv': 'text/csv', '.txt': 'text/plain', '.md': 'text/markdown',
+        '.json': 'application/json', '.zip': 'application/zip'
+      };
+
+      promotedArtifacts.push({
+        path: relativeArtifact,
+        size: destinationStat.size,
+        modifiedAt: destinationStat.mtime.toISOString(),
+        mimeType: mimeTypes[ext] || 'application/octet-stream'
+      });
+
       console.log('[ARTIFACT] Promoted Hermes output:', destination);
     } catch (error) {
       console.warn('[ARTIFACT] Could not promote Hermes output:', sourcePath, error.message);
     }
   }
 
-  artifacts = diff(before);
+  const artifacts = [
+    ...diff(before),
+    ...promotedArtifacts
+  ].filter((artifact, index, list) =>
+    list.findIndex(item => item.path === artifact.path) === index
+  );
 
   return {
     handled: true,
     tool: 'ask_hermes',
-    response: result.response || 'Hermes completed the task.',
+    response: cleanHermesUserResponse(responseText),
     sessionId: result.sessionId || null,
     continuationCount: result.continuationCount || 0,
     artifacts
