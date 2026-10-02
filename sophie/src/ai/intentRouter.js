@@ -3,6 +3,7 @@ const SELF_INSPECT_PATTERN = /\b(your (source code|architecture|own code)|what f
 const EXPLICIT_SEARCH = /\b(search for|search the web|look up|google that|do some research)\b/i;
 
 const FRESHNESS_WORDS = /\b(latest|today|currently|current|recent(ly)?|this week|this month|breaking news)\b/i;
+const SPORTS_RECENCY_PATTERN = /\b(last|most recent|latest)\s+(match|game|fixture|result|score)\b|\b(last match|last game|most recent match|most recent game)\b/i;
 
 const VISION_PATTERNS = /\b(analyze this image|look at this|what do you see|what is in this image|what's in this picture)\b/i;
 
@@ -22,7 +23,7 @@ function routeIntent(command) {
     return 'SELF_INSPECT';
   }
 
-  if (EXPLICIT_SEARCH.test(text) || FRESHNESS_WORDS.test(text)) {
+  if (EXPLICIT_SEARCH.test(text) || FRESHNESS_WORDS.test(text) || SPORTS_RECENCY_PATTERN.test(text)) {
     return 'WEB_RESEARCH';
   }
 
