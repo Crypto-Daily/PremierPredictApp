@@ -2108,29 +2108,47 @@ async function finishCommandFromStatus(data, thinkingElement) {
     data.startedAt ? Date.now() - data.startedAt : 0
   );
 
-  finishThinking(thinkingElement, durationMs);
-
   if (data.status === 'complete' && data.result) {
     const result = data.result;
 
-    if (result.text) {
-      addMessage(result.text, 'sophie', '', result.requestId || null);
+    const lastSophieMessage = [...messages.querySelectorAll('.message.sophie')]
+      .filter(el => !el.classList.contains('thinking'))
+      .pop();
+
+    const alreadyRendered =
+      lastSophieMessage &&
+      result.text &&
+      lastSophieMessage.textContent.trim().includes(result.text.trim().slice(0, 80));
+
+    if (!alreadyRendered && result.text) {
+      addMessage(result.text, 'sophie', '', data.command || result.requestId || null);
       addArtifactLinks(result.artifacts);
       maybeSpeak(result.text, window._activeVoiceRequest === requestId);
-    } else {
+    } else if (!alreadyRendered) {
       addMessage(JSON.stringify(result, null, 2), 'sophie');
     }
 
+    finishThinking(thinkingElement, null);
+
+    const worked = document.createElement('div');
+    worked.className = 'worked-duration';
+    worked.textContent = 'Worked for ' + formatDuration(durationMs);
+    messages.appendChild(worked);
+
     await loadThreads();
-  } else if (data.status === 'cancelled') {
-    addMessage('Stopped.', 'sophie');
-  } else if (data.status === 'error') {
-    console.error('[SOPHIE] Command failed:', data.error);
-    addMessage(
-      'I could not complete that request. ' +
-      (data.error?.message || 'Please try again.'),
-      'sophie'
-    );
+  } else {
+    finishThinking(thinkingElement, null);
+
+    if (data.status === 'cancelled') {
+      addMessage('Stopped.', 'sophie');
+    } else if (data.status === 'error') {
+      console.error('[SOPHIE] Command failed:', data.error);
+      addMessage(
+        'I could not complete that request. ' +
+        (data.error?.message || 'Please try again.'),
+        'sophie'
+      );
+    }
   }
 
   forgetPendingRequest(requestId);
@@ -2154,6 +2172,9 @@ async function resumePendingRequest() {
     }
 
     const data = await response.json();
+    if (data.status === 'complete' || data.status === 'error' || data.status === 'cancelled') {
+      await loadThreads();
+    }
     activeRequestId = requestId;
     commandBusy = data.status === 'working' || data.status === 'cancelling';
 
