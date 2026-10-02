@@ -6,6 +6,48 @@ const { snapshot, diff, WORKSPACE_ROOT } = require('../core/artifactManager');
 const fs = require('node:fs');
 const path = require('node:path');
 
+function cleanHermesUserResponse(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const hidden = [];
+  let skipping = false;
+
+  for (const line of lines) {
+    const lower = line.toLowerCase().trim();
+
+    if (
+      lower.startsWith('image saved to:') ||
+      lower.startsWith('file saved to:') ||
+      lower.startsWith('artifact saved to:') ||
+      lower.startsWith('generated via meta ai') ||
+      lower.startsWith('the first default attempt came back empty') ||
+      lower.startsWith('retried with the ') ||
+      lower.includes('which routed successfully through the same backend')
+    ) {
+      skipping = true;
+      continue;
+    }
+
+    if (skipping) {
+      if (!lower || lower.startsWith('let me know') || lower.startsWith('here')) skipping = false;
+      else continue;
+    }
+
+    if (
+      lower.includes('/home/ubuntu/sophie/') ||
+      lower.includes('whatsmeow bridge') ||
+      lower.includes('provider name') ||
+      lower.includes('verified on disk')
+    ) {
+      continue;
+    }
+
+    hidden.push(line);
+  }
+
+  const cleaned = hidden.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return cleaned || 'Done.';
+}
+
 function buildHermesTask({ command, mode, intent, memoryFacts = [], conversation = [] }) {
   const memoryText = memoryFacts.length
     ? memoryFacts.map(f => '- ' + f.fact).join('\n')
