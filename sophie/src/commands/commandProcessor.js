@@ -390,11 +390,10 @@ class CommandProcessor {
 
       const conversation = this.memory.getRecentMessages(21).slice(0, -1);
 
-      const useWebSearch =
-        intent !== 'MEMORY' &&
-        intent !== 'CREATION' &&
-        intent !== 'DEVICE_CONTROL' &&
-        intent !== 'VISION';
+      // Web search is opt-in for research/freshness requests.
+      // Ordinary GPT chat must answer from the configured model instead of
+      // forcing every message through the research pipeline.
+      const useWebSearch = intent === 'WEB_RESEARCH';
 
       let researchResults = null;
 
