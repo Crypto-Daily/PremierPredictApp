@@ -24,6 +24,11 @@ const { saveTask, loadTask, checkpoint, removeTask } = require('../src/nexus/wor
 const { recordArtifact, buildLineage } = require('../src/nexus/artifactLineage');
 const { listTools } = require('../src/tools');
 const { validateArtifact } = require('../src/nexus/artifactWriter');
+const { parseCsv, analyzeCsv } = require('../src/nexus/dataWorkbench');
+const { composeWorkflow, startWorkflow, verifyWorkflow } = require('../src/nexus/workflowComposer');
+const { authorize, checkRateLimit } = require('../src/server/security');
+const diagnostics = require('../src/server/diagnostics');
+const { diagnose } = require('../src/nexus/diagnostics');
 
 (async () => {
 
