@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict');
+const{chunkText,buildEvidence,limits}=require('../src/nexus/multimodal');
+const{retrieveRelevant,detectConflicts}=require('../src/nexus/memoryIndex');
+assert.equal(chunkText('abcdefghij',4).length,1);
+assert.equal(limits({maxArtifactBytes:1234,chunkBytes:2048}).maxArtifactBytes,1234);
+assert.equal(buildEvidence('alpha beta\ngamma alpha','alpha',{chunkBytes:1024,evidenceChunks:2}).length,1);
+assert.equal(retrieveRelevant([{fact:'bounded memory',confidence:.9}],[],'bounded').length,1);
+assert.ok(detectConflicts([{fact:'uses bounded memory retrieval'},{fact:'uses unbounded memory retrieval'}]).length>=1);
+console.log('phase18 tests passed');
