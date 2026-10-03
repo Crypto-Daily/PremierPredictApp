@@ -25,7 +25,7 @@ const { recordArtifact, buildLineage } = require('../src/nexus/artifactLineage')
 const { listTools } = require('../src/tools');
 const { validateArtifact } = require('../src/nexus/artifactWriter');
 
-const { determinePlan, verifyResponse } = {
+(async () => {\n\nconst { determinePlan, verifyResponse } = {
   determinePlan: require('../src/nexus/orchestrator').determinePlan,
   verifyResponse: require('../src/nexus/verification').verifyResponse
 };
@@ -150,4 +150,4 @@ assert.strictEqual(health.status, 'ok');
 assert.ok(typeof health.uptimeSeconds === 'number');
 assert.strictEqual(diagnose().ok, true);
 
-console.log('NEXUS core tests passed.');
+console.log('NEXUS core tests passed.');\n})();
