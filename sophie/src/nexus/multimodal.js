@@ -1,80 +1,14 @@
 'use strict';
-
-const fs = require('node:fs');
-const path = require('node:path');
-const { resolveArtifact } = require('../core/artifactManager');
-const { execFileSync } = require('node:child_process');
-
-const MIME = {
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp', '.gif': 'image/gif',
-  '.pdf': 'application/pdf', '.txt': 'text/plain', '.md': 'text/markdown',
-  '.csv': 'text/csv', '.json': 'application/json', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation', '.pdf': 'application/pdf'
-};
-
-function classifyFile(filePath) {
-  const ext = path.extname(String(filePath || '')).toLowerCase();
-  if (/\.(png|jpe?g|webp|gif)$/i.test(ext)) return 'image';
-  if (/\.(pdf|txt|md|csv|json|docx|xlsx|pptx)$/i.test(ext)) return 'document';
-  if (/\.(mp3|wav|m4a|ogg|webm)$/i.test(ext)) return 'audio';
-  return 'unknown';
-}
-
-function extractOfficeXml(resolved, ext) {
-  const entries = {
-    '.docx': ['word/document.xml', 'word/header1.xml', 'word/footer1.xml'],
-    '.xlsx': ['xl/sharedStrings.xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml'],
-    '.pptx': ['ppt/presentation.xml', 'ppt/slides/slide1.xml']
-  }[ext];
-  if (!entries) return null;
-  try {
-    const chunks = entries.map(entry => {
-      try { return execFileSync('unzip', ['-p', resolved, entry], { encoding: 'utf8', timeout: 5000, maxBuffer: 5 * 1024 * 1024 }); }
-      catch { return ''; }
-    }).filter(Boolean);
-    if (!chunks.length) return null;
-    return chunks.join('\n').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\\s+/g, ' ').trim();
-  } catch { return null; }
-}
-
-function extractPdf(resolved, maxBytes) {
-  try {
-    return execFileSync('pdftotext', ['-layout', resolved, '-'], { encoding: 'utf8', timeout: 10000, maxBuffer: maxBytes }).slice(0, maxBytes);
-  } catch { return null; }
-}
-
-function readStructuredFile(filePath, maxBytes = 2_000_000) {
-  const resolved = resolveArtifact(filePath);
-  const stat = fs.statSync(resolved);
-  if (!stat.isFile()) throw new Error('Artifact is not a file.');
-  if (stat.size > maxBytes) throw new Error('Artifact exceeds the analysis size limit.');
-
-  const ext = path.extname(resolved).toLowerCase();
-  if (!['.txt', '.md', '.csv', '.json'].includes(ext)) {
-    const extracted = ext === '.pdf' ? extractPdf(resolved, maxBytes) : extractOfficeXml(resolved, ext);
-    return { path: resolved, type: classifyFile(resolved), mime: MIME[ext] || null, binary: !extracted, size: stat.size, text: extracted || undefined, extracted: Boolean(extracted) };
-  }
-
-  const text = fs.readFileSync(resolved, 'utf8');
-  return {
-    path: resolved,
-    type: classifyFile(resolved),
-    mime: MIME[ext] || 'application/octet-stream',
-    text: text.slice(0, maxBytes),
-    truncated: text.length > maxBytes,
-    size: stat.size
-  };
-}
-
-function summarizeTable(text, delimiter = ',') {
-  const rows = String(text || '').trim().split(/\r?\n/).filter(Boolean);
-  if (!rows.length) return { rows: 0, columns: 0, headers: [] };
-  const columns = rows.map(row => row.split(delimiter).length);
-  return {
-    rows: rows.length,
-    columns: Math.max(...columns),
-    headers: rows[0].split(delimiter).map(x => x.trim()).slice(0, 50)
-  };
-}
-
-module.exports = { classifyFile, readStructuredFile, summarizeTable, MIME };
+const fs=require('node:fs'),path=require('node:path');const{resolveArtifact}=require('../core/artifactManager');const{execFileSync}=require('node:child_process');
+const DEFAULT_MAX_ARTIFACT_BYTES=50*1024*1024,DEFAULT_CHUNK_BYTES=64*1024,DEFAULT_EVIDENCE_CHUNKS=24;
+const MIME={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.pdf':'application/pdf','.txt':'text/plain','.md':'text/markdown','.csv':'text/csv','.json':'application/json','.docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','.xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','.pptx':'application/vnd.openxmlformats-officedocument.presentationml.presentation'};
+function envBytes(n,f){const v=Number(process.env[n]);return Number.isFinite(v)&&v>0?Math.floor(v):f}
+function limits(o={}){return{maxArtifactBytes:o.maxArtifactBytes||envBytes('SOPHIE_MAX_ARTIFACT_BYTES',DEFAULT_MAX_ARTIFACT_BYTES),chunkBytes:o.chunkBytes||envBytes('SOPHIE_CHUNK_BYTES',DEFAULT_CHUNK_BYTES),evidenceChunks:o.evidenceChunks||envBytes('SOPHIE_EVIDENCE_CHUNKS',DEFAULT_EVIDENCE_CHUNKS)}}
+function classifyFile(f){const e=path.extname(String(f||'')).toLowerCase();if(/\.(png|jpe?g|webp|gif)$/i.test(e))return'image';if(/\.(pdf|txt|md|csv|json|docx|xlsx|pptx)$/i.test(e))return'document';if(/\.(mp3|wav|m4a|ogg|webm)$/i.test(e))return'audio';return'unknown'}
+function extractOfficeXml(r,e,max){const entries={'.docx':['word/document.xml','word/header1.xml','word/footer1.xml'],'.xlsx':['xl/sharedStrings.xml','xl/workbook.xml','xl/worksheets/sheet1.xml'],'.pptx':['ppt/presentation.xml','ppt/slides/slide1.xml']}[e];if(!entries)return null;try{const xs=entries.map(x=>{try{return execFileSync('unzip',['-p',r,x],{encoding:'utf8',timeout:5000,maxBuffer:max})}catch{return''}}).filter(Boolean);return xs.length?xs.join('\n').replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim().slice(0,max):null}catch{return null}}
+function extractPdf(r,max){try{return execFileSync('pdftotext',['-layout',r,'-'],{encoding:'utf8',timeout:30000,maxBuffer:max}).slice(0,max)}catch{return null}}
+function chunkText(text,chunkBytes=DEFAULT_CHUNK_BYTES){const s=String(text||''),size=Math.max(1024,Number(chunkBytes)||DEFAULT_CHUNK_BYTES),out=[];for(let o=0,i=0;o<s.length;o+=size,i++)out.push({index:i,start:o,end:Math.min(s.length,o+size),text:s.slice(o,o+size)});return out}
+function buildEvidence(text,query='',options={}){const c=limits(options),chunks=chunkText(text,c.chunkBytes);if(!query)return chunks.slice(0,c.evidenceChunks);const terms=[...new Set(String(query).toLowerCase().match(/[a-z0-9_]{2,}/g)||[])];return chunks.map(x=>({...x,score:terms.length?terms.reduce((n,t)=>n+(x.text.toLowerCase().includes(t)?1:0),0)/terms.length:0})).sort((a,b)=>b.score-a.score||a.index-b.index).slice(0,c.evidenceChunks)}
+function readStructuredFile(filePath,options={}){const c=limits(options),r=resolveArtifact(filePath),st=fs.statSync(r);if(!st.isFile())throw new Error('Artifact is not a file.');if(st.size>c.maxArtifactBytes)throw new Error(`Artifact exceeds configured limit of ${c.maxArtifactBytes} bytes.`);const e=path.extname(r).toLowerCase();let text,extracted=false;if(['.txt','.md','.csv','.json'].includes(e)){text=fs.readFileSync(r,'utf8');extracted=true}else{text=e==='.pdf'?extractPdf(r,c.maxArtifactBytes):extractOfficeXml(r,e,c.maxArtifactBytes);extracted=Boolean(text)}if(!text)return{path:r,type:classifyFile(r),mime:MIME[e]||null,binary:true,extracted:false,size:st.size,complete:false,reason:'No local text extractor available for this format.'};const chunks=chunkText(text,c.chunkBytes);return{path:r,type:classifyFile(r),mime:MIME[e]||'application/octet-stream',text,size:st.size,extracted,complete:true,truncated:false,chunkCount:chunks.length,chunks}}
+function summarizeTable(text,delimiter=','){const rows=String(text||'').trim().split(/\r?\n/).filter(Boolean);if(!rows.length)return{rows:0,columns:0,headers:[]};const cols=rows.map(r=>r.split(delimiter).length);return{rows:rows.length,columns:Math.max(...cols),headers:rows[0].split(delimiter).map(x=>x.trim()).slice(0,50)}}
+module.exports={classifyFile,readStructuredFile,summarizeTable,chunkText,buildEvidence,limits,MIME,DEFAULT_MAX_ARTIFACT_BYTES,DEFAULT_CHUNK_BYTES};
