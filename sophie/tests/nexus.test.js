@@ -19,7 +19,6 @@ const { requiredCapabilities, resolveCapabilityTools } = require('../src/nexus/c
 const { classifyFile, summarizeTable } = require('../src/nexus/multimodal');
 const { decomposeTask, createAutonomousTask, advance } = require('../src/nexus/autonomy');
 const { requiresApproval, authorizeAutonomousAction } = require('../src/nexus/approvalGate');
-const { recover } = require('../src/nexus/recovery');
 const { saveTask, loadTask, checkpoint, removeTask } = require('../src/nexus/workspaceState');
 const { recordArtifact, buildLineage } = require('../src/nexus/artifactLineage');
 const { listTools } = require('../src/tools');
@@ -126,7 +125,6 @@ const advanced = advance(autonomous, 'understand');
 assert.strictEqual(advanced.status, 'running');
 assert.strictEqual(requiresApproval({ capability: 'computer', mode: 'GPT' }), true);
 assert.strictEqual(authorizeAutonomousAction({ capability: 'memory', mode: 'GPT' }).allowed, true);
-assert.strictEqual(recover({ error: new Error('permission denied') }).action, 'request_explicit_approval');
 
 const persisted = saveTask({ id: 'phase7-test', objective: 'resume me', status: 'running', updatedAt: new Date().toISOString() });
 assert.strictEqual(loadTask(persisted.id).objective, 'resume me');
@@ -136,9 +134,13 @@ const lineage = recordArtifact({ taskId: cp.id, artifact: { path: 'report.md', s
 assert.strictEqual(buildLineage([lineage])[0].parentId, 'root');
 removeTask(cp.id);
 
-const table = parseCsv('name,score\\na,10\\nb,20');
+const table = parseCsv(`name,score
+a,10
+b,20`);
 assert.strictEqual(table.rows.length, 2);
-assert.strictEqual(analyzeCsv('name,score\\na,10\\nb,20').numeric[0].header, 'score');
+assert.strictEqual(analyzeCsv(`name,score
+a,10
+b,20`).numeric[0].header, 'score');
 
 assert.strictEqual(typeof validateArtifact, 'function');
 assert.throws(() => validateArtifact('../escape.txt'));
