@@ -15,9 +15,10 @@ async function analyzeArtifact({ artifactPath, objective = 'Analyze this artifac
   const type = classifyFile(resolved);
   if (!['image', 'document', 'audio'].includes(type)) throw new Error('Unsupported multimodal artifact type: ' + type);
 
-  if (type === 'document' && /\.(txt|md|csv|json)$/i.test(resolved)) {
+  if (type === 'document') {
     const data = readStructuredFile(resolved);
-    return { ok: true, type, source: path.basename(resolved), analysis: await askSophie(data.text, promptFor(type, objective)) };
+    if (data.text) return { ok: true, type, source: path.basename(resolved), extracted: true, analysis: await askSophie(data.text, promptFor(type, objective)) };
+    return { ok: false, type, source: path.basename(resolved), extracted: false, reason: 'No local text extractor is available for this binary artifact on the server.' };
   }
 
   const stat = fs.statSync(resolved);
