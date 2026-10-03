@@ -15,16 +15,33 @@ Configure provider/API variables required by the existing provider router and He
 
 ## Deploy
 
-From the Ubuntu server:
+Sophie is deployed through a **staging checkout**. The live directory is never used for Git resets.
+
+Defaults:
+- Live: `/home/ubuntu/sophie`
+- Staging: `/home/ubuntu/sophie-stage/PremierPredictApp/sophie`
+
+You can override the staging location with `SOPHIE_STAGE_DIR`.
+
+Run:
 
 ```bash
-cd /home/ubuntu
+cd /home/ubuntu/sophie
 export SOPHIE_APP_DIR=/home/ubuntu/sophie
+export SOPHIE_STAGE_DIR=/home/ubuntu/sophie-stage
 export SOPHIE_BRANCH=main
 bash "$SOPHIE_APP_DIR/deploy/ubuntu-install.sh"
 ```
 
-The script fetches the canonical GitHub `main` branch, installs locked dependencies, preserves runtime data/.env, and starts or reloads PM2.
+The deployment process is:
+
+1. Pull `main` into the staging checkout.
+2. Install dependencies in staging.
+3. Run `npm run check`.
+4. Run `npm test`.
+5. Only if both pass, synchronize the Sophie application into the live directory.
+6. Preserve the live `.env`, `data/`, `workspace/`, `logs/`, and `backups/`.
+7. Reload PM2.
 
 ## Verify
 
