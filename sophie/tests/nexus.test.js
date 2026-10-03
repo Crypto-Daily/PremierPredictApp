@@ -25,7 +25,9 @@ const { recordArtifact, buildLineage } = require('../src/nexus/artifactLineage')
 const { listTools } = require('../src/tools');
 const { validateArtifact } = require('../src/nexus/artifactWriter');
 
-(async () => {\n\nconst { determinePlan, verifyResponse } = {
+(async () => {
+
+const { determinePlan, verifyResponse } = {
   determinePlan: require('../src/nexus/orchestrator').determinePlan,
   verifyResponse: require('../src/nexus/verification').verifyResponse
 };
