@@ -4,6 +4,7 @@ const express = require('express');
 const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
 const cors = require('cors');
+const { checkRateLimit, authorize, audit } = require('./security');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -66,7 +67,7 @@ function clearUpgradeCookie(res) {
  * --------------------------------------------------
  */
 
-app.use(cors());
+app.use(cors({ origin: process.env.SOPHIE_CORS_ORIGIN || false, credentials: true }));
 
 app.use(
   express.json({
