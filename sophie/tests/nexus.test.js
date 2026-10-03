@@ -145,4 +145,10 @@ const rate = checkRateLimit(limitedReq);
 assert.strictEqual(rate.allowed, true);
 rate.release();
 
+diagnostics.recordRequest({ ok: true });
+const health = diagnostics.snapshot();
+assert.strictEqual(health.status, 'ok');
+assert.ok(typeof health.uptimeSeconds === 'number');
+assert.strictEqual(diagnose().ok, true);
+
 console.log('NEXUS core tests passed.');
