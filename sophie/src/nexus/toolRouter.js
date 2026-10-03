@@ -1,6 +1,6 @@
 'use strict';
 
-const { getTool, listTools } = require('../tools');
+const { getTool, listTools } = require('../tools/toolRegistry');
 const { authorizeCapability } = require('./orchestrator');
 const { capabilityForIntent } = require('./capabilities');
 
