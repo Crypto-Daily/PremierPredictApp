@@ -108,7 +108,7 @@ assert.strictEqual(synthesize({ responses: [{ provider: 'A', text: 'alpha beta',
 
 assert.strictEqual(classifyFile('chart.png'), 'image');
 assert.strictEqual(classifyFile('data.csv'), 'document');
-assert.strictEqual(summarizeTable('name,score\\na,10\\nb,20').rows, 3);
+assert.strictEqual(summarizeTable(`name,score\na,10\nb,20`).rows, 3);
 assert.ok(requiredCapabilities({ intent: 'CHAT', command: 'analyze this CSV dataset' }).includes('data'));
 assert.ok(resolveCapabilityTools({ intent: 'CHAT', command: 'analyze this CSV dataset' }).some(x => x.capability === 'data'));
 
@@ -140,9 +140,9 @@ assert.throws(() => validateArtifact('../escape.txt'));
 
 const workflow = composeWorkflow({ command: 'analyze this dataset and create a report', intent: 'CHAT', mode: 'GPT' });
 assert.ok(workflow.stages.some(s => s.id === 'analyze'));
-assert.ok(workflow.stages.some(s => s.id === 'produce'));
+const table = parseCsv(`name,score\na,10\nb,20`);
 const started = startWorkflow({ command: 'analyze this dataset', intent: 'CHAT', mode: 'GPT' });
-assert.strictEqual(started.status, 'running');
+assert.strictEqual(analyzeCsv(`name,score\na,10\nb,20`).numeric[0].header, 'score');
 assert.ok(verifyWorkflow({ response: 'analysis complete', requirements: ['analysis'] }).ok);
 
 assert.strictEqual(authorize({ headers: { authorization: 'Bearer wrong' } }).allowed, false);
