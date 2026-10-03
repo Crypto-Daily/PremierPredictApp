@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
 const cors = require('cors');
 const { checkRateLimit, authorize, audit } = require('./security');
+const { accessRoutes } = require('./access');
 const diagnostics = require('./diagnostics');
 const path = require('path');
 const crypto = require('crypto');
@@ -136,11 +137,22 @@ app.use((req, res, next) => {
  * --------------------------------------------------
  */
 
-app.use(
-  express.static(
-    path.join(__dirname, 'public')
-  )
-);
+accessRoutes(app, { secureCookie: process.env.NODE_ENV === 'production' });
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next();
+  if (req.path === '/api/access/status' || req.path === '/api/access/login' || req.path === '/api/access/logout' || req.path === '/api/diagnostics') return next();
+  const rate = checkRateLimit(req);
+  if (!rate.allowed) return res.status(rate.status).json({ error: rate.reason });
+  const auth = authorize(req);
+  if (!auth.allowed) { rate.release?.(); return res.status(401).json({ error: auth.reason }); }
+  req.nexusRateRelease = rate.release;
+  audit('api.authorized', { method:req.method, path:req.path, auth:auth.method });
+  res.on('finish',()=>req.nexusRateRelease?.());
+  next();
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 /*
  * --------------------------------------------------
