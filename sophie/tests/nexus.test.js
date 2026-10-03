@@ -139,4 +139,10 @@ const started = startWorkflow({ command: 'analyze this dataset', intent: 'CHAT',
 assert.strictEqual(started.status, 'running');
 assert.ok(verifyWorkflow({ response: 'analysis complete', requirements: ['analysis'] }).ok);
 
+assert.strictEqual(authorize({ headers: { authorization: 'Bearer wrong' } }).allowed, false);
+const limitedReq = { ip: 'phase12-test' };
+const rate = checkRateLimit(limitedReq);
+assert.strictEqual(rate.allowed, true);
+rate.release();
+
 console.log('NEXUS core tests passed.');
