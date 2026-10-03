@@ -33,7 +33,7 @@ function sanitizeExternalContent(content, source = 'tool') {
 }
 
 function containsInjection(text) {
-  return /ignore\s+(all|previous|prior)\s+instructions|reveal\s+(the|your)\s+(system|developer)\s+prompt|bypass\s+(security|authentication|access)/i.test(String(text || ''));
+  return /ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|ignore\s+all\s+instructions|reveal\s+(?:the|your)\s+(?:system|developer)\s+prompt|bypass\s+(?:security|authentication|access)/i.test(String(text || ''));
 }
 
 function capabilityPolicy({ capability, available = true, authorized = true } = {}) {
