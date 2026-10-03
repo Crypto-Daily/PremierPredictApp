@@ -1,28 +1,6 @@
 'use strict';
-
-function tokenize(value) {
-  return new Set(String(value || '').toLowerCase().match(/[a-z0-9_]{2,}/g) || []);
-}
-
-function score(query, text) {
-  const q = tokenize(query);
-  const t = tokenize(text);
-  if (!q.size || !t.size) return 0;
-  let hits = 0;
-  for (const term of q) if (t.has(term)) hits++;
-  return hits / q.size;
-}
-
-function retrieveRelevant(facts = [], messages = [], query = '', limit = 8) {
-  const items = [
-    ...facts.map((x, i) => ({ type: 'fact', id: i, text: x.fact || '', item: x })),
-    ...messages.map((x, i) => ({ type: 'message', id: i, text: x.text || '', item: x }))
-  ];
-  return items
-    .map(item => ({ ...item, relevance: score(query, item.text) }))
-    .filter(item => item.relevance > 0)
-    .sort((a, b) => b.relevance - a.relevance)
-    .slice(0, limit);
-}
-
-module.exports = { retrieveRelevant };
+function tokenize(v){return new Set(String(v||'').toLowerCase().match(/[a-z0-9_]{2,}/g)||[])}
+function score(qry,txt,item={}){const q=tokenize(qry),t=tokenize(txt);if(!q.size||!t.size)return 0;let h=0;for(const x of q)if(t.has(x))h++;const lexical=h/q.size,age=item.createdAt?Math.max(0,1-((Date.now()-Date.parse(item.createdAt))/31536000000)):0,confidence=Number.isFinite(Number(item.confidence))?Number(item.confidence):.5;return lexical*.72+age*.13+confidence*.15}
+function retrieveRelevant(facts=[],messages=[],query='',limit=8){const n=Math.max(1,Math.min(50,Number(limit)||8)),items=[...facts.map((x,i)=>({type:'fact',id:x.id||i,text:x.fact||'',item:x})),...messages.map((x,i)=>({type:'message',id:i,text:x.text||'',item:x}))];return items.map(x=>({...x,relevance:score(query,x.text,x.item)})).filter(x=>x.relevance>0).sort((a,b)=>b.relevance-a.relevance).slice(0,n)}
+function detectConflicts(facts=[]){const out=[];for(let i=0;i<facts.length;i++)for(let j=i+1;j<facts.length;j++){const a=tokenize(facts[i].fact),b=tokenize(facts[j].fact),o=[...a].filter(x=>b.has(x)).length/Math.max(1,Math.min(a.size,b.size));if(o>=.75&&String(facts[i].fact).toLowerCase()!==String(facts[j].fact).toLowerCase())out.push({left:facts[i],right:facts[j],overlap:o})}return out.slice(0,25)}
+module.exports={tokenize,score,retrieveRelevant,detectConflicts};
