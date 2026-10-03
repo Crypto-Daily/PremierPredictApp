@@ -140,7 +140,6 @@ assert.throws(() => validateArtifact('../escape.txt'));
 
 const workflow = composeWorkflow({ command: 'analyze this dataset and create a report', intent: 'CHAT', mode: 'GPT' });
 assert.ok(workflow.stages.some(s => s.id === 'analyze'));
-const table = parseCsv(`name,score\na,10\nb,20`);
 const started = startWorkflow({ command: 'analyze this dataset', intent: 'CHAT', mode: 'GPT' });
 assert.strictEqual(analyzeCsv(`name,score\na,10\nb,20`).numeric[0].header, 'score');
 assert.ok(verifyWorkflow({ response: 'analysis complete', requirements: ['analysis'] }).ok);
