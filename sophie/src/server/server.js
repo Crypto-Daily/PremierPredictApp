@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
 const cors = require('cors');
 const { checkRateLimit, authorize, audit } = require('./security');
+const diagnostics = require('./diagnostics');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -25,6 +26,10 @@ const {
 } = require('../core/selfUpgrade');
 
 const app = express();
+
+app.get('/api/diagnostics', (req, res) => {
+  res.json(diagnostics.snapshot());
+});
 app.set('trust proxy', 1);
 
 const upgradeSessions = new Map();
