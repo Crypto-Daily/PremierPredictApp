@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict');
+const security=require('../src/server/security');
+assert.equal(typeof security.checkRateLimit,'function');
+assert.equal(typeof security.authorize,'function');
+assert.equal(typeof security.login,'function');
+assert.equal(typeof security.sessionStatus,'function');
+const status=security.sessionStatus({headers:{},ip:'test',socket:{remoteAddress:'test'}});
+assert.equal(typeof status.required,'boolean');
+console.log('phase20 security tests passed');
