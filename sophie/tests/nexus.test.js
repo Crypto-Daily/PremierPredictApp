@@ -152,4 +152,5 @@ assert.strictEqual(health.status, 'ok');
 assert.ok(typeof health.uptimeSeconds === 'number');
 assert.strictEqual(diagnose().ok, true);
 
-console.log('NEXUS core tests passed.');\n})();
+console.log('NEXUS core tests passed.');
+})();
