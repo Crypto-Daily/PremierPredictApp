@@ -141,7 +141,7 @@ accessRoutes(app, { secureCookie: process.env.NODE_ENV === 'production' });
 
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api/')) return next();
-  if (req.path === '/api/access/status' || req.path === '/api/access/login' || req.path === '/api/access/logout' || req.path === '/api/diagnostics') return next();
+  if (req.path === '/api/access/status' || req.path === '/api/access/login' || req.path === '/api/access/logout') return next();
   const rate = checkRateLimit(req);
   if (!rate.allowed) return res.status(rate.status).json({ error: rate.reason });
   const auth = authorize(req);
