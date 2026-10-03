@@ -24,6 +24,11 @@ const { saveTask, loadTask, checkpoint, removeTask } = require('../src/nexus/wor
 const { recordArtifact, buildLineage } = require('../src/nexus/artifactLineage');
 const { listTools } = require('../src/tools');
 const { validateArtifact } = require('../src/nexus/artifactWriter');
+const { parseCsv, analyzeCsv } = require('../src/nexus/dataWorkbench');
+const { composeWorkflow, startWorkflow, verifyWorkflow } = require('../src/nexus/workflowComposer');
+const { authorize, checkRateLimit } = require('../src/server/security');
+const diagnostics = require('../src/server/diagnostics');
+const { diagnose } = require('../src/nexus/diagnostics');
 
 (async () => {
 
@@ -140,7 +145,6 @@ assert.throws(() => validateArtifact('../escape.txt'));
 
 const workflow = composeWorkflow({ command: 'analyze this dataset and create a report', intent: 'CHAT', mode: 'GPT' });
 assert.ok(workflow.stages.some(s => s.id === 'analyze'));
-const table = parseCsv(`name,score\na,10\nb,20`);
 const started = startWorkflow({ command: 'analyze this dataset', intent: 'CHAT', mode: 'GPT' });
 assert.strictEqual(analyzeCsv(`name,score\na,10\nb,20`).numeric[0].header, 'score');
 assert.ok(verifyWorkflow({ response: 'analysis complete', requirements: ['analysis'] }).ok);

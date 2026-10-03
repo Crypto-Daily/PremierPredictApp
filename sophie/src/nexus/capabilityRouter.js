@@ -1,6 +1,6 @@
 'use strict';
 
-const { getTool } = require('../tools');
+const { getTool } = require('../tools/toolRegistry');
 
 const INTENT_CAPABILITY = {
   VISION: 'vision',
