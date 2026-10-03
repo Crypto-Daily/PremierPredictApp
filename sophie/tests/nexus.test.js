@@ -12,7 +12,6 @@ const { executeLoop } = require('../src/nexus/executionLoop');
 const { retrieveRelevant } = require('../src/nexus/memoryIndex');
 const { selectConsensus } = require('../src/nexus/providerConsensus');
 const { capabilityForIntent } = require('../src/nexus/capabilities');
-const { sanitizeExternalContent } = require('../src/nexus/policy');
 const { createTaskState, transition } = require('../src/nexus/taskState');
 const { summarizeRun, deriveLessons } = require('../src/nexus/learning');
 const { synthesize } = require('../src/nexus/synthesis');
