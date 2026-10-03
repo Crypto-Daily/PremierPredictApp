@@ -107,9 +107,9 @@ assert.strictEqual(summarizeTable('name,score\\na,10\\nb,20').rows, 3);
 assert.ok(requiredCapabilities({ intent: 'CHAT', command: 'analyze this CSV dataset' }).includes('data'));
 assert.ok(resolveCapabilityTools({ intent: 'CHAT', command: 'analyze this CSV dataset' }).some(x => x.capability === 'data'));
 
-const plan = decomposeTask({ command: 'research this CSV and produce a report', intent: 'WEB_RESEARCH', mode: 'GPT' });
-assert.ok(plan.steps.some(step => step.id === 'research'));
-assert.ok(plan.steps.some(step => step.id === 'capability:data'));
+const autonomousPlan = decomposeTask({ command: 'research this CSV and produce a report', intent: 'WEB_RESEARCH', mode: 'GPT' });
+assert.ok(autonomousPlan.steps.some(step => step.id === 'research'));
+assert.ok(autonomousPlan.steps.some(step => step.id === 'capability:data'));
 const autonomous = createAutonomousTask({ command: 'inspect project', intent: 'CHAT', mode: 'GPT' });
 assert.strictEqual(autonomous.status, 'planned');
 const advanced = advance(autonomous, 'understand');
