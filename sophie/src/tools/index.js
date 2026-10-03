@@ -13,6 +13,7 @@ const workflowTool = require('./workflowTool');
 const diagnosticsTool = require('./diagnosticsTool');
 const recoveryTool = require('./recoveryTool');
 const plannerTool = require('./plannerTool');
+const executionTool = require('./executionTool');
 
 registerTool(hermesTool);
 registerTool(nexusTool);
@@ -26,5 +27,6 @@ registerTool(workflowTool);
 registerTool(diagnosticsTool);
 registerTool(recoveryTool);
 registerTool(plannerTool);
+registerTool(executionTool);
 
 module.exports = { registerTool, getTool, listTools, describeTool };
