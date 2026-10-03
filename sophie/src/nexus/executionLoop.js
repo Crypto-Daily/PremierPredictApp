@@ -1,6 +1,7 @@
 'use strict';
 
 const { verifyResponse } = require('./verification');
+const { saveTask, checkpoint } = require('./workspaceState');
 
 async function executeLoop({
   taskState = null,
@@ -15,14 +16,15 @@ async function executeLoop({
   if (typeof execute !== 'function') throw new Error('execute() is required.');
 
   const history = [];
-  let state = { status: 'planned', plan };
+  let state = { status: 'planned', plan, taskState };
+  if (taskState?.id) state.taskState = checkpoint({ ...taskState, status: 'running' }, 'execution_started', { plan });
 
   for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
     onStep({ phase: 'EXECUTE', iteration });
     const result = await execute({ iteration, state, history });
 
     history.push({ phase: 'EXECUTE', iteration, result });
-    state = { ...state, execution: result, status: 'executed', taskState: taskState ? { ...taskState, status: 'executed', iteration } : null };
+    state = { ...state, execution: result, status: 'executed', taskState: taskState ? saveTask({ ...state.taskState, status: 'executed', iteration }) : null };
 
     onStep({ phase: 'OBSERVE', iteration });
     const observation = typeof observe === 'function'
@@ -30,7 +32,7 @@ async function executeLoop({
       : result;
 
     history.push({ phase: 'OBSERVE', iteration, observation });
-    state = { ...state, observation, status: 'observed', taskState: taskState ? { ...state.taskState, status: 'observed' } : state.taskState };
+    state = { ...state, observation, status: 'observed', taskState: taskState ? checkpoint({ ...state.taskState, status: 'observed' }, 'observed', { iteration }) : state.taskState };
 
     onStep({ phase: 'VERIFY', iteration });
     const verification = typeof verify === 'function'
@@ -38,7 +40,7 @@ async function executeLoop({
       : verifyResponse({ text: observation?.text || observation, execution: result });
 
     history.push({ phase: 'VERIFY', iteration, verification });
-    state = { ...state, verification, status: verification.ok ? 'verified' : 'verification_failed', taskState: taskState ? { ...state.taskState, status: verification.ok ? 'verified' : 'verification_failed' } : state.taskState };
+    state = { ...state, verification, status: verification.ok ? 'verified' : 'verification_failed', taskState: taskState ? checkpoint({ ...state.taskState, status: verification.ok ? 'verified' : 'verification_failed' }, verification.ok ? 'verified' : 'verification_failed', { iteration, verification }) : state.taskState };
 
     if (verification.ok) {
       return { ok: true, state, history, iterations: iteration };
