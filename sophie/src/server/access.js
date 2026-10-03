@@ -1,0 +1,4 @@
+'use strict';
+const{login,revokeSession,sessionStatus,getCookie,SESSION_TTL_MS}=require('./security');
+function accessRoutes(app,{secureCookie=false}={}){app.get('/api/access/status',(req,res)=>res.json(sessionStatus(req)));app.post('/api/access/login',(req,res)=>{const token=login(req.body?.password);if(!token)return res.status(401).json({error:'Invalid access password.'});res.setHeader('Set-Cookie',`sophie_access=${encodeURIComponent(token)}; Max-Age=${Math.floor(SESSION_TTL_MS/1000)}; Path=/; HttpOnly; SameSite=Strict${secureCookie?'; Secure':''}`);res.json({ok:true,expiresIn:SESSION_TTL_MS})});app.post('/api/access/logout',(req,res)=>{revokeSession(getCookie(req,'sophie_access'));res.setHeader('Set-Cookie','sophie_access=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict'+(secureCookie?'; Secure':''));res.json({ok:true})})}
+module.exports={accessRoutes};
