@@ -1,0 +1,10 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { classifyError, backoffMs, canFallback } = require('../src/nexus/recovery');
+assert.equal(classifyError({ status: 503 }).recoverable, true);
+assert.equal(classifyError({ status: 401 }).requiresApproval, true);
+assert.equal(classifyError({ status: 400 }).recoverable, false);
+assert.equal(backoffMs(1), 500);
+assert.equal(canFallback({ failedProvider: 'Gemini', candidateProvider: 'Groq', reason: { recoverable: true } }), true);
+assert.equal(canFallback({ failedProvider: 'Gemini', candidateProvider: 'Groq', reason: { recoverable: false } }), false);
+console.log('NEXUS recovery tests passed.');
