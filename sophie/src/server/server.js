@@ -230,6 +230,16 @@ app.get('/', (req, res) => {
  * --------------------------------------------------
  */
 
+app.get('/api/tools', (req, res) => {
+  try {
+    const { listTools } = require('../tools/toolRegistry');
+    res.json({ tools: listTools() });
+  } catch (error) {
+    console.error('[TOOLS] list error:', error);
+    res.status(500).json({ error: 'Could not list runtime tools.' });
+  }
+});
+
 app.get('/api/status', (req, res) => {
 
   res.json({
@@ -482,7 +492,8 @@ app.post(
 
     res.json({
       ok: true,
-      status: 'cancelling'
+      status: 'cancelling',
+      requestId: req.params.requestId
     });
   }
 );
