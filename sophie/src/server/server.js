@@ -77,7 +77,7 @@ app.use(cors({ origin: process.env.SOPHIE_CORS_ORIGIN || false, credentials: tru
 
 app.use(
   express.json({
-    limit: '10mb'
+    limit: '12mb'
   })
 );
 
