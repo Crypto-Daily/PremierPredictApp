@@ -3,6 +3,7 @@
 import { initLogin } from './login.js';
 import { renderArtifacts, initArtifacts } from './artifacts.js';
 import { renderRecents, initRecents } from './recents.js';
+import { initControls } from './controls.js';
 
 const $ = selector => document.querySelector(selector);
 const feed = $('#feed');
@@ -33,46 +34,57 @@ function addActions(node, role, text) {
   const bar = document.createElement('div');
   bar.className = 'msg-actions';
 
-  const add = (label, title, handler) => {
+  const icons = {
+    copy: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
+    select: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H4a1 1 0 0 0-1 1v3M17 3h3a1 1 0 0 1 1 1v3M21 17v3a1 1 0 0 1-1 1h-3M3 17v3a1 1 0 0 0 1 1h3"></path><path d="M8 8h8v8H8z"></path></svg>',
+    edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 10.8-10.8a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z"></path><path d="m14.5 6.5 3 3"></path></svg>',
+    share: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="m8.2 10.8 7.5-4.3M8.2 13.2l7.5 4.3"></path></svg>',
+    regenerate: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.7-4L3 10"></path><path d="M3 5v5h5"></path><path d="M4 13a8 8 0 0 0 14.7 4L21 14"></path><path d="M21 19v-5h-5"></path></svg>'
+  };
+
+  const add = (icon, title, handler) => {
     const button = document.createElement('button');
     button.className = 'msg-action';
-    button.textContent = label;
+    button.type = 'button';
+    button.innerHTML = icons[icon];
     button.title = title;
+    button.setAttribute('aria-label', title);
     button.addEventListener('click', handler);
     bar.appendChild(button);
   };
 
-  add('Copy', 'Copy message', () => navigator.clipboard?.writeText(text));
-  add('Select', 'Select text', () => {
-    const range = document.createRange();
-    range.selectNodeContents(node.querySelector('.body'));
-    const selection = getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
+  add('copy', 'Copy message', async () => {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
   });
 
   if (role === 'user') {
-    add('Edit', 'Edit prompt', () => {
+    add('select', 'Select text', () => {
+      const range = document.createRange();
+      range.selectNodeContents(node.querySelector('.body'));
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+    add('edit', 'Edit prompt', () => {
       input.value = text;
       input.focus();
     });
-    add('Share', 'Share prompt', async () => {
-      if (navigator.share) await navigator.share({ text });
-      else await navigator.clipboard?.writeText(text);
-    });
   } else {
-    add('Regenerate', 'Regenerate response', () => {
+    add('share', 'Share response', async () => {
+      if (navigator.share) await navigator.share({ text });
+      else if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+    });
+    add('regenerate', 'Regenerate response', () => {
       const previous = [...document.querySelectorAll('.msg.user')].pop();
       if (previous) {
         input.value = previous.querySelector('.body').textContent;
-        send(true);
+        send();
       }
     });
   }
 
   node.appendChild(bar);
 }
-
 function msg(role, text, options = {}) {
   $('#welcome')?.remove();
   const node = document.createElement('div');
@@ -221,20 +233,6 @@ function bindInterface() {
     });
   });
 
-  const menu = () => {
-    app.classList.toggle('menu-open');
-    app.classList.remove('inspector-open');
-  };
-  $('#mobileMenu').addEventListener('click', menu);
-  $('#menuClose').addEventListener('click', () => app.classList.remove('menu-open'));
-  $('#panelBtn').addEventListener('click', () => {
-    app.classList.toggle('inspector-open');
-    app.classList.remove('menu-open');
-  });
-  $('#intelligenceBtn').addEventListener('click', () => {
-    app.classList.remove('menu-open');
-    feed.scrollTop = feed.scrollHeight;
-  });
   $('#diagBtn').addEventListener('click', async () => {
     app.classList.add('inspector-open');
     app.classList.remove('menu-open');
@@ -249,6 +247,14 @@ function bindInterface() {
 const { ensureAccess } = initLogin({ api, loadWorkspace: load });
 initRecents({ api, app, refresh: load });
 initArtifacts({ app, root: $('#artifacts') });
+initControls({
+  api,
+  app,
+  ensureAccess,
+  loadWorkspace: load,
+  onMessage: msg,
+  setState: text => { $('#commandState').textContent = text || ''; }
+});
 bindInterface();
 
 ensureAccess().then(authenticated => {

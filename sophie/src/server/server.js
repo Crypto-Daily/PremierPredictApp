@@ -77,7 +77,7 @@ app.use(cors({ origin: process.env.SOPHIE_CORS_ORIGIN || false, credentials: tru
 
 app.use(
   express.json({
-    limit: '10mb'
+    limit: '12mb'
   })
 );
 
@@ -503,6 +503,47 @@ app.post(
  * ARTIFACTS
  * --------------------------------------------------
  */
+
+app.post('/api/upload', (req, res) => {
+  try {
+    const { name, mimeType, data } = req.body || {};
+    if (typeof data !== 'string' || !data) {
+      return res.status(400).json({ error: 'File data is required.' });
+    }
+
+    const decoded = Buffer.from(data, 'base64');
+    if (!decoded.length) {
+      return res.status(400).json({ error: 'The uploaded file is empty.' });
+    }
+    if (decoded.length > 8 * 1024 * 1024) {
+      return res.status(413).json({ error: 'File exceeds the 8 MB upload limit.' });
+    }
+
+    fs.mkdirSync(WORKSPACE_ROOT, { recursive: true });
+    const original = path.basename(String(name || 'upload.bin'));
+    const safeName = original.replace(/[^a-zA-Z0-9._ ()-]/g, '_').slice(0, 180) || 'upload.bin';
+    let target = path.join(WORKSPACE_ROOT, safeName);
+    if (fs.existsSync(target)) {
+      const ext = path.extname(safeName);
+      const stem = path.basename(safeName, ext);
+      target = path.join(WORKSPACE_ROOT, stem + '-' + Date.now() + ext);
+    }
+
+    fs.writeFileSync(target, decoded);
+    audit('file_upload', { path: path.relative(WORKSPACE_ROOT, target), size: decoded.length, mimeType: mimeType || 'application/octet-stream' });
+
+    res.json({
+      ok: true,
+      name: path.basename(target),
+      path: path.relative(WORKSPACE_ROOT, target).split(path.sep).join('/'),
+      size: decoded.length,
+      mimeType: mimeType || 'application/octet-stream'
+    });
+  } catch (error) {
+    console.error('[UPLOAD] ERROR:', error);
+    res.status(500).json({ error: 'Could not upload file.' });
+  }
+});
 
 app.get('/api/artifacts', (req, res) => {
   try {
