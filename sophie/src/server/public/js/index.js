@@ -69,11 +69,11 @@ function addActions(node, role, text) {
       input.value = text;
       input.focus();
     });
-    add('share', 'Share prompt', async () => {
+  } else {
+    add('share', 'Share response', async () => {
       if (navigator.share) await navigator.share({ text });
       else if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
     });
-  } else {
     add('regenerate', 'Regenerate response', () => {
       const previous = [...document.querySelectorAll('.msg.user')].pop();
       if (previous) {
