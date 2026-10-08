@@ -59,3 +59,88 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 @media(max-width:650px){.execution-strip{font-size:9px}.live-detail{min-height:26px}.preview-body{max-height:35vh}}
 .artifact-row{display:flex;align-items:center;gap:6px;border-bottom:1px solid #192231}.artifact-row .artifact-link{flex:1;border:0}.artifact-open{border:1px solid #253247;background:#0c131d;color:#6f8097;border-radius:7px;padding:5px 7px;font-size:9px;cursor:pointer}.artifact-open:hover{color:#fff;border-color:#3a4b66}
 .jarvis-badge{display:inline-flex;align-items:center;gap:7px;border:1px solid #304b70;background:#0e1827;color:#9dbbff;border-radius:999px;padding:6px 9px;font-size:9px;font-weight:800;letter-spacing:.12em}.jarvis-badge[hidden],.jarvis-panel[hidden]{display:none}.jarvis-eye{width:7px;height:7px;border-radius:50%;background:#78a7ff;box-shadow:0 0 13px #78a7ff}.jarvis-card{border-color:#30466a}.jarvis-head{display:flex;justify-content:space-between;align-items:center}.jarvis-head h3{margin-bottom:5px}.jarvis-state{font-size:11px;color:#9aabc2}.jarvis-ring{width:28px;height:28px;border-radius:50%;border:1px solid #3b5e91;box-shadow:inset 0 0 12px rgba(93,137,220,.15),0 0 14px rgba(74,115,190,.15)}.jarvis-ring.active{animation:jarvisPulse 1.4s ease-in-out infinite;border-color:#78a7ff}@keyframes jarvisPulse{50%{box-shadow:inset 0 0 18px rgba(120,167,255,.35),0 0 22px rgba(120,167,255,.4)}}.screen-preview{margin-top:12px;min-height:145px;border:1px solid #202e42;background:#070b11;border-radius:11px;overflow:hidden;display:flex;align-items:center;justify-content:center}.screen-preview img{display:block;width:100%;height:auto;max-height:270px;object-fit:contain}.screen-placeholder{text-align:center;color:#5e6d82;padding:25px}.screen-placeholder span{display:block;font-size:26px;color:#718ab2;margin-bottom:7px}.screen-placeholder b{display:block;color:#a0aec0;font-size:11px}.screen-placeholder small{display:block;margin-top:5px;line-height:1.5;font-size:9px}.jarvis-controls{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:9px}.jarvis-controls button{border:1px solid #2a3c56;background:#0d1520;color:#9caec7;border-radius:8px;padding:8px;font-size:10px;cursor:pointer}.jarvis-controls button:hover{color:#fff;border-color:#466388}.jarvis-card.live{box-shadow:0 0 0 1px rgba(120,167,255,.08),0 0 28px rgba(67,105,175,.1)}
+
+
+/* Attachments */
+.upload-tray{
+  width:min(900px,calc(100% - clamp(28px,10vw,148px)));
+  margin:10px auto 0;
+  padding:10px 12px;
+  background:rgba(11,16,24,.94);
+  border:1px solid #253247;
+  border-radius:14px;
+  box-shadow:0 14px 40px rgba(0,0,0,.25);
+}
+.upload-tray[hidden]{display:none}
+.upload-tray-head{display:flex;align-items:center;justify-content:space-between;color:#8492a7;font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;margin-bottom:7px}
+.upload-tray-head button,.upload-remove{
+  width:28px;height:28px;border:1px solid #263449;background:#0c131d;color:#718096;border-radius:8px;cursor:pointer
+}
+.upload-tray-head button:hover,.upload-remove:hover{color:#fff;border-color:#3a4b66}
+.upload-list{display:flex;flex-wrap:wrap;gap:7px}
+.upload-item{
+  display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;
+  padding:7px 8px;background:#101824;border:1px solid #202e42;border-radius:10px
+}
+.upload-file-icon{width:25px;height:25px;display:grid;place-items:center;border-radius:7px;background:#182438;color:#8eb3ff;font-size:14px}
+.upload-file-info{min-width:0;display:grid;gap:2px}
+.upload-file-info b{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#dbe4f1}
+.upload-file-info small{font-size:9px;color:#65748a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-remove{width:24px;height:24px;font-size:15px;line-height:1}
+
+/* Message action icons */
+.msg-actions{display:flex;align-items:center;gap:5px;margin-top:9px;opacity:.82}
+.msg-action{
+  width:30px;height:30px;display:grid;place-items:center;
+  border:1px solid #202b3b;background:#0b1018;color:#718096;
+  border-radius:8px;padding:0;font-size:14px;line-height:1;cursor:pointer
+}
+.msg-action:hover{color:#fff;border-color:#3a4b66;background:#111a27}
+.msg-action:active{transform:translateY(1px)}
+
+/* Sophie naming modal */
+.name-modal{
+  position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;
+  padding:20px;background:rgba(2,4,8,.72);backdrop-filter:blur(18px)
+}
+.name-modal[hidden]{display:none}
+.name-dialog{
+  position:relative;width:min(430px,calc(100vw - 30px));padding:25px;
+  background:linear-gradient(180deg,#111925,#0b1018);
+  border:1px solid #2b3b53;border-radius:22px;
+  box-shadow:0 35px 100px rgba(0,0,0,.65)
+}
+.name-close{
+  position:absolute;right:14px;top:14px;width:34px;height:34px;
+  border:1px solid #263449;background:#0c131d;color:#8492a7;border-radius:10px;
+  cursor:pointer;font-size:20px
+}
+.name-close:hover{color:#fff;border-color:#40536f}
+.name-orb{
+  width:42px;height:42px;border-radius:50%;margin-bottom:17px;
+  background:radial-gradient(circle at 34% 28%,#fff 0 8%,#82aaff 24%,#6b55ff 60%,#18152f 100%);
+  box-shadow:0 0 30px rgba(91,112,255,.4)
+}
+.name-kicker{font-size:9px;letter-spacing:.2em;font-weight:800;color:#6f9dff;margin-bottom:7px}
+.name-dialog h2{margin:0;font-size:22px;letter-spacing:-.02em}
+.name-dialog p{margin:7px 0 18px;color:#748299;font-size:12px;line-height:1.55}
+.name-dialog label{display:block;color:#8d9aae;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}
+.name-dialog input{
+  width:100%;height:46px;padding:0 13px;outline:0;
+  border:1px solid #2b3a50;border-radius:11px;background:#070b11;color:#f4f7fc
+}
+.name-dialog input:focus{border-color:#5874a1;box-shadow:0 0 0 3px rgba(122,168,255,.07)}
+.name-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:17px}
+.name-secondary,.name-primary{
+  min-height:40px;padding:8px 15px;border-radius:10px;cursor:pointer;font-weight:750
+}
+.name-secondary{border:1px solid #29374b;background:#0d141e;color:#8492a7}
+.name-primary{border:0;background:#edf3ff;color:#070a0e}
+.name-secondary:hover{color:#fff}.name-primary:hover{filter:brightness(.95)}
+body.modal-open{overflow:hidden}
+@media(max-width:650px){
+  .upload-tray{width:calc(100% - 18px);margin:8px auto 0;padding:8px 9px}
+  .upload-item{flex:1 1 100%}
+  .upload-file-info b{max-width:calc(100vw - 125px)}
+  .name-dialog{padding:22px}
+}
