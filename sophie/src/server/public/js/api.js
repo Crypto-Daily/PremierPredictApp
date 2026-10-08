@@ -4,26 +4,22 @@ export async function api(url, options = {}) {
   const response = await fetch(url, {
     ...options,
     credentials: options.credentials || 'same-origin',
-    cache: options.cache || 'no-store',
-    headers: {
-      ...(options.body && typeof options.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.headers || {})
-    }
+    cache: options.cache || 'no-store'
   });
 
   const type = response.headers.get('content-type') || '';
-  const payload = type.includes('application/json')
+  const body = type.includes('application/json')
     ? await response.json().catch(() => ({}))
-    : await response.text().catch(() => '');
+    : await response.text();
 
   if (!response.ok) {
-    const message = typeof payload === 'string'
-      ? payload
-      : payload?.error || payload?.message;
-    throw new Error(message || \`Request failed (\${response.status})\`);
+    const message = typeof body === 'object' && body
+      ? (body.error || body.message || `Request failed (${response.status})`)
+      : String(body || `Request failed (${response.status})`);
+    throw new Error(message);
   }
 
-  return payload;
+  return body;
 }
 
 export async function postJson(url, body) {
