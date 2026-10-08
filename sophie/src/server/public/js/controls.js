@@ -1,5 +1,7 @@
 'use strict';
 
+import { postJson } from './api.js';
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -17,7 +19,7 @@ function dataUrlParts(dataUrl) {
 
 async function captureScreen() {
   if (!navigator.mediaDevices?.getDisplayMedia) {
-    throw new Error('This browser does not provide screen capture. Upload a screenshot instead.');
+    throw new Error('Screen sharing is not supported here. Upload a screenshot instead.');
   }
 
   const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -40,122 +42,95 @@ async function captureScreen() {
     });
 
     await video.play().catch(() => {});
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 180));
 
     const width = Math.min(video.videoWidth || 1280, 2560);
     const height = Math.min(video.videoHeight || 720, 1440);
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
+    canvas.getContext('2d').drawImage(video, 0, 0, width, height);
 
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Could not prepare the screen image.');
-
-    context.drawImage(video, 0, 0, width, height);
     return canvas.toDataURL('image/jpeg', 0.86).split(',')[1];
   } finally {
     stream.getTracks().forEach(track => track.stop());
   }
 }
 
-function closeDrawers(app) {
-  app?.classList.remove('menu-open', 'inspector-open');
-}
-
-function openInspector(app) {
-  app?.classList.add('inspector-open');
-  app?.classList.remove('menu-open');
-}
-
 export function initControls({
   api,
   app,
-  input,
   ensureAccess,
   loadWorkspace,
+  onMessage,
   setStatus,
-  setModeLabel,
-  onSend,
-  onStop,
-  onDiagnostics,
-  onArtifactFocus
+  setMode
 }) {
-  const bind = (selector, event, handler) => {
-    const node = document.querySelector(selector);
-    node?.addEventListener(event, handler);
-    return node;
+  const $ = selector => document.querySelector(selector);
+  const input = $('#input');
+
+  const closePanels = () => {
+    app.classList.remove('menu-open', 'inspector-open');
   };
 
-  bind('#mobileMenu', 'click', () => {
-    app?.classList.toggle('menu-open');
-    app?.classList.remove('inspector-open');
+  $('#mobileMenu')?.addEventListener('click', () => {
+    app.classList.toggle('menu-open');
+    app.classList.remove('inspector-open');
   });
 
-  bind('#menuClose', 'click', () => app?.classList.remove('menu-open'));
+  $('#menuClose')?.addEventListener('click', () => app.classList.remove('menu-open'));
 
-  bind('#panelBtn', 'click', () => {
-    app?.classList.toggle('inspector-open');
-    app?.classList.remove('menu-open');
+  $('#panelBtn')?.addEventListener('click', () => {
+    app.classList.toggle('inspector-open');
+    app.classList.remove('menu-open');
   });
 
-  bind('#intelligenceBtn', 'click', () => {
-    closeDrawers(app);
-    document.querySelector('#feed')?.scrollTo({
-      top: document.querySelector('#feed')?.scrollHeight || 0,
-      behavior: 'smooth'
-    });
+  $('#intelligenceBtn')?.addEventListener('click', () => {
+    closePanels();
+    $('#feed')?.scrollTo({ top: $('#feed').scrollHeight, behavior: 'smooth' });
   });
 
-  bind('#artifactBtn', 'click', () => {
-    openInspector(app);
-    onArtifactFocus?.();
+  $('#artifactBtn')?.addEventListener('click', () => {
+    app.classList.add('inspector-open');
+    app.classList.remove('menu-open');
+    $('#artifacts')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 
-  bind('#diagBtn', 'click', async () => {
-    openInspector(app);
-    setStatus('Running diagnostics…');
+  $('#diagBtn')?.addEventListener('click', async () => {
+    if (!(await ensureAccess())) return;
+    app.classList.add('inspector-open');
+    app.classList.remove('menu-open');
     try {
-      const result = await api('/api/diagnostics');
-      onDiagnostics?.(result);
+      setStatus('Collecting diagnostics…');
+      const diagnostics = await api('/api/diagnostics');
+      onMessage('assistant', 'Diagnostics\n' + JSON.stringify(diagnostics, null, 2));
       setStatus('Diagnostics complete.');
     } catch (error) {
       setStatus(error.message || 'Diagnostics failed.');
     }
   });
 
-  bind('#mode', 'click', async event => {
+  $('#mode')?.addEventListener('click', async () => {
     if (!(await ensureAccess())) return;
-
-    const button = event.currentTarget;
-    if (button.dataset.busy === '1') return;
-
-    button.dataset.busy = '1';
-    button.setAttribute('aria-busy', 'true');
-    setStatus('Switching mode…');
-
+    const button = $('#mode');
     try {
+      button.disabled = true;
+      setStatus('Switching mode…');
       const current = await api('/api/mode');
-      const next = String(current.mode || '').toUpperCase() === 'JARVIS' ? 'GPT' : 'JARVIS';
-      const selected = await api('/api/mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: next })
-      });
-
-      const label = selected.label || selected.name || selected.mode || (next === 'JARVIS' ? 'Jarvis Mode' : 'GPT Mode');
-      setModeLabel(label);
-      setStatus(next === 'JARVIS'
+      const next = String(current.mode).toUpperCase() === 'JARVIS' ? 'GPT' : 'JARVIS';
+      const selected = await postJson('/api/mode', { mode: next });
+      setMode(selected);
+      setStatus(selected.mode === 'JARVIS'
         ? 'Jarvis Mode enabled. Screen perception is ready.'
         : 'GPT Mode enabled.');
     } catch (error) {
       setStatus(error.message || 'Could not switch mode.');
     } finally {
-      delete button.dataset.busy;
-      button.removeAttribute('aria-busy');
+      button.disabled = false;
     }
   });
 
-  bind('#attach', 'click', async () => {
+  $('#attach')?.addEventListener('click', async () => {
     if (!(await ensureAccess())) return;
 
     const picker = document.createElement('input');
@@ -178,18 +153,12 @@ export function initControls({
         setStatus('Uploading ' + file.name + '…');
         const dataUrl = await readFileAsDataUrl(file);
         const parts = dataUrlParts(dataUrl);
-
-        await api('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: file.name,
-            mimeType: parts.mimeType,
-            data: parts.data
-          })
+        const result = await postJson('/api/upload', {
+          name: file.name,
+          mimeType: parts.mimeType,
+          data: parts.data
         });
-
-        setStatus('Uploaded: ' + file.name);
+        setStatus('Uploaded: ' + result.name);
         await loadWorkspace();
       } catch (error) {
         setStatus('Upload failed: ' + (error.message || 'Unknown error.'));
@@ -199,31 +168,26 @@ export function initControls({
     picker.click();
   });
 
-  bind('#screen', 'click', async () => {
+  $('#screen')?.addEventListener('click', async () => {
     if (!(await ensureAccess())) return;
 
     try {
       const mode = await api('/api/mode');
-      if (String(mode.mode || '').toUpperCase() !== 'JARVIS') {
+      if (String(mode.mode).toUpperCase() !== 'JARVIS') {
         setStatus('Switch to Jarvis Mode first, then tap Screen.');
-        document.querySelector('#mode')?.focus();
+        $('#mode')?.focus();
         return;
       }
 
       setStatus('Choose the screen or window to share…');
       const image = await captureScreen();
       setStatus('Analyzing your screen with Jarvis…');
-
-      const result = await api('/api/jarvis/screen', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image,
-          question: input?.value?.trim() || undefined
-        })
+      const result = await postJson('/api/jarvis/screen', {
+        image,
+        question: input?.value?.trim() || undefined
       });
 
-      if (result.text) onSend?.({ text: result.text, external: true });
+      if (result.text) onMessage('assistant', result.text);
       setStatus('Screen analysis complete.');
       await loadWorkspace();
     } catch (error) {
@@ -231,31 +195,23 @@ export function initControls({
     }
   });
 
-  document.querySelectorAll('.chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      input.value = chip.textContent.trim();
+  document.querySelectorAll('.chip').forEach(button => {
+    button.addEventListener('click', () => {
+      input.value = button.dataset.prompt || button.textContent.trim();
       input.focus();
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('input'));
     });
   });
 
-  bind('#send', 'click', () => {
-    if (onStop?.()) return;
-    onSend?.();
+  input?.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 180) + 'px';
   });
 
   input?.addEventListener('keydown', event => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      if (onStop?.()) return;
-      onSend?.();
+      $('#send')?.click();
     }
   });
-
-  input?.addEventListener('input', () => {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 220) + 'px';
-  });
-
-  setStatus('Ready');
 }
