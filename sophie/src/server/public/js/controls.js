@@ -221,7 +221,8 @@ export function initControls({
       });
 
       if (result.text) onMessage('assistant', result.text);
-      setJarvisState('Active', 'analysis complete');\n      setStatus('Screen analysis complete.');
+      setJarvisState('Active', 'analysis complete');
+      setStatus('Screen analysis complete.');
       await loadWorkspace();
     } catch (error) {
       setStatus(error.message || 'Screen capture failed.');
