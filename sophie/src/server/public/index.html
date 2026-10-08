@@ -64,6 +64,14 @@
       </div>
     </header>
 
+    <section class="upload-tray" id="uploadTray" hidden aria-live="polite">
+      <div class="upload-tray-head">
+        <span>Attachments</span>
+        <button id="clearUploads" type="button" aria-label="Clear attachment list" title="Clear attachment list">×</button>
+      </div>
+      <div class="upload-list" id="uploadList"></div>
+    </section>
+
     <section class="feed" id="feed">
       <div class="welcome" id="welcome">
         <div class="eyebrow">UNIVERSAL MULTIMODAL AI ORCHESTRATOR</div>
@@ -117,6 +125,25 @@
     </div>
   </section>
 </div>
+
+<div class="name-modal" id="nameModal" hidden>
+  <div class="name-dialog" role="dialog" aria-modal="true" aria-labelledby="nameModalTitle">
+    <button class="name-close" id="nameCancel" type="button" aria-label="Close">×</button>
+    <div class="name-orb" aria-hidden="true"></div>
+    <div class="name-kicker">NEXUS WORKSPACE</div>
+    <h2 id="nameModalTitle">Create a new chat</h2>
+    <p id="nameModalHint">Give this conversation a name.</p>
+    <form id="nameForm">
+      <label for="nameInput">Name</label>
+      <input id="nameInput" name="name" type="text" maxlength="120" autocomplete="off" placeholder="Enter a name">
+      <div class="name-actions">
+        <button class="name-secondary" id="nameCancelButton" type="button">Cancel</button>
+        <button class="name-primary" id="nameConfirm" type="submit">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script type="module" src="/js/index.js"></script>
 </body>
 </html>
