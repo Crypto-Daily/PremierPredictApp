@@ -37,11 +37,12 @@ function addActions(node, role, text) {
   const bar = document.createElement('div');
   bar.className = 'msg-actions';
 
-  const add = (label, title, handler) => {
+  const add = (icon, title, handler) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'msg-action';
-    button.textContent = label;
+    button.textContent = icon;
+    button.setAttribute('aria-label', title);
     button.title = title;
     button.addEventListener('click', async () => {
       try { await handler(); } catch (error) { setStatus(error.message || 'Action failed.'); }
@@ -49,13 +50,13 @@ function addActions(node, role, text) {
     bar.appendChild(button);
   };
 
-  add('Copy', 'Copy message', async () => {
+  add('⧉', 'Copy message', async () => {
     if (!navigator.clipboard) throw new Error('Clipboard access is unavailable.');
     await navigator.clipboard.writeText(text);
     setStatus('Copied.');
   });
 
-  add('Select', 'Select message text', () => {
+  add('☷', 'Select message text', () => {
     const body = node.querySelector('.body');
     const range = document.createRange();
     range.selectNodeContents(body);
@@ -65,13 +66,13 @@ function addActions(node, role, text) {
   });
 
   if (role === 'user') {
-    add('Edit', 'Edit prompt', () => {
+    add('✎', 'Edit prompt', () => {
       input.value = text;
       input.focus();
       input.dispatchEvent(new Event('input'));
     });
 
-    add('Share', 'Share prompt', async () => {
+    add('↗', 'Share prompt', async () => {
       if (navigator.share) await navigator.share({ text });
       else {
         await navigator.clipboard.writeText(text);
@@ -79,7 +80,7 @@ function addActions(node, role, text) {
       }
     });
   } else {
-    add('Regenerate', 'Run the last prompt again', async () => {
+    add('↻', 'Regenerate response', async () => {
       const previous = [...document.querySelectorAll('.msg.user')].pop();
       if (!previous || getState().command.running) return;
       input.value = previous.querySelector('.body').textContent;
@@ -186,6 +187,48 @@ function setStatus(text) {
     $('#statusText').textContent = 'NEXUS online';
   }
 }
+
+function renderUploads(files = []) {
+  const tray = $('#uploadTray');
+  const list = $('#uploadList');
+  if (!tray || !list) return;
+
+  if (!files.length) {
+    tray.hidden = true;
+    list.innerHTML = '';
+    return;
+  }
+
+  tray.hidden = false;
+  list.innerHTML = files.map((file, index) => {
+    const name = escapeHtml(file.name || 'Uploaded file');
+    const size = file.size ? formatFileSize(file.size) : '';
+    const type = escapeHtml(file.mimeType || file.type || 'file');
+    return '<div class="upload-item">' +
+      '<span class="upload-file-icon">↳</span>' +
+      '<div class="upload-file-info"><b>' + name + '</b><small>' + type + (size ? ' · ' + size : '') + '</small></div>' +
+      '<button class="upload-remove" type="button" data-upload-index="' + index + '" aria-label="Remove ' + name + '" title="Remove">×</button>' +
+      '</div>';
+  }).join('');
+
+  list.querySelectorAll('.upload-remove').forEach(button => {
+    button.addEventListener('click', () => {
+      const index = Number(button.dataset.uploadIndex);
+      uploadedFiles.splice(index, 1);
+      renderUploads(uploadedFiles);
+    });
+  });
+}
+
+function formatFileSize(bytes) {
+  const value = Number(bytes || 0);
+  if (!value) return '';
+  if (value < 1024) return value + ' B';
+  if (value < 1024 * 1024) return Math.round(value / 1024) + ' KB';
+  return (value / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+const uploadedFiles = [];
 
 function setMode(mode) {
   const label = mode?.name || mode?.label || (mode?.mode === 'JARVIS' ? 'Jarvis Mode' : 'GPT Mode');
@@ -375,11 +418,20 @@ const { ensureAccess } = initLogin({
 initRecents({ api, app, refresh: loadWorkspace });
 initArtifacts({ app, root: $('#artifacts') });
 
+$('#clearUploads')?.addEventListener('click', () => {
+  uploadedFiles.length = 0;
+  renderUploads();
+});
+
 initControls({
   api,
   app,
   ensureAccess,
   loadWorkspace,
+  onUpload: file => {
+    uploadedFiles.push(file);
+    renderUploads(uploadedFiles);
+  },
   onMessage: (role, text) => msg(role, text),
   setStatus,
   setMode
