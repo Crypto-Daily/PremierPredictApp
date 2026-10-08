@@ -54,7 +54,7 @@
 
   <main>
     <header class="topbar">
-      <div class="top-left">
+      <div class="top-left"><div class="jarvis-badge" id="jarvisBadge" hidden><span class="jarvis-eye"></span><span>JARVIS LIVE</span></div>
         <button class="mobile-menu" id="mobileMenu" aria-label="Open workspace menu">☰</button>
         <div class="status"><span class="dot"></span><span id="statusText">NEXUS online</span></div>
       </div>
@@ -93,7 +93,7 @@
     </div>
   </main>
 
-  <section class="inspector">
+  <section class="inspector"><div class="jarvis-panel" id="jarvisPanel" hidden><div class="card jarvis-card"><div class="jarvis-head"><div><h3>Jarvis perception</h3><div class="jarvis-state" id="jarvisState">Standby</div></div><span class="jarvis-ring" id="jarvisRing"></span></div><div class="screen-preview" id="screenPreview"><div class="screen-placeholder"><span>⌗</span><b>Screen context</b><small>Capture your screen with the Screen button.</small></div></div><div class="jarvis-controls"><button id="captureAgain" type="button">Capture screen</button><button id="clearScreen" type="button">Clear</button></div></div></div>
     <div class="card">
       <h3>Execution pipeline</h3>
       <div class="pipeline" id="pipeline">
