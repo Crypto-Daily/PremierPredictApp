@@ -13,7 +13,7 @@ const input = $('#input');
 const app = $('.app');
 
 let activeOutput = null;
-let statusPoll = null;
+let statusPoll = null;\nlet executionStartedAt = 0;\nlet executionClock = null;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -141,7 +141,7 @@ function renderHistory(thread) {
   });
 }
 
-function pipeline(step) {
+function updateLive(activity = 'Working…', step = 0, state = 'running') {\n  const strip = $('#executionStrip');\n  const label = $('#executionLabel');\n  const liveTitle = $('#liveTitle');\n  const liveDetail = $('#liveDetail');\n  const progress = $('#liveProgress');\n  const card = $('#liveCard');\n  if (!strip || !label || !liveTitle || !liveDetail || !progress || !card) return;\n  strip.hidden = state !== 'running';\n  label.textContent = state === 'running' ? activity : (state === 'complete' ? 'Completed' : 'Stopped');\n  liveTitle.textContent = state === 'running' ? 'Sophie is working' : (state === 'complete' ? 'Task complete' : 'Task stopped');\n  liveDetail.textContent = activity || 'Processing…';\n  progress.style.width = state === 'complete' ? '100%' : Math.min(95, Math.max(6, ((step + 1) / 9) * 100)) + '%';\n  card.classList.toggle('running', state === 'running');\n  card.classList.toggle('complete', state === 'complete');\n}\n\nfunction startExecutionClock() {\n  executionStartedAt = Date.now();\n  clearInterval(executionClock);\n  executionClock = setInterval(() => {\n    const el = $('#executionTime');\n    if (el) el.textContent = Math.floor((Date.now() - executionStartedAt) / 1000) + 's';\n  }, 250);\n}\n\nfunction stopExecutionClock() { clearInterval(executionClock); executionClock = null; }\n\nfunction pipeline(step) {
   document.querySelectorAll('.step').forEach((node, index) => {
     node.classList.toggle('on', index === step);
     node.classList.toggle('done', index < step);
