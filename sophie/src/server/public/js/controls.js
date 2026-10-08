@@ -11,7 +11,7 @@ function readFileAsDataUrl(file) {
   });
 }
 
-function dataUrlParts(dataUrl) {
+function showJarvisImage(image) {\n  const preview = document.querySelector('#screenPreview');\n  if (!preview || !image) return;\n  const src = image.startsWith('data:') ? image : 'data:image/jpeg;base64,' + image;\n  preview.innerHTML = '';\n  const img = document.createElement('img');\n  img.src = src;\n  img.alt = 'Latest screen context';\n  preview.appendChild(img);\n}\n\nfunction setJarvisState(state, detail = '') {\n  const panel = document.querySelector('#jarvisPanel');\n  const badge = document.querySelector('#jarvisBadge');\n  const label = document.querySelector('#jarvisState');\n  const ring = document.querySelector('#jarvisRing');\n  if (!panel || !label || !ring) return;\n  const active = state === 'Active' || state === 'Analyzing';\n  label.textContent = detail ? state + ' · ' + detail : state;\n  ring.classList.toggle('active', active);\n  panel.hidden = false;\n  if (badge) badge.hidden = false;\n}\n\nfunction clearJarvisPreview() {\n  const preview = document.querySelector('#screenPreview');\n  if (!preview) return;\n  preview.innerHTML = '<div class="screen-placeholder"><span>⌗</span><b>Screen context</b><small>Capture your screen with the Screen button.</small></div>';\n}\n\nfunction dataUrlParts(dataUrl) {
   const match = /^data:([^;,]+)?;base64,(.*)$/.exec(dataUrl);
   if (!match) throw new Error('Could not prepare the selected file.');
   return { mimeType: match[1] || 'application/octet-stream', data: match[2] };
@@ -168,7 +168,7 @@ export function initControls({
     picker.click();
   });
 
-  $('#screen')?.addEventListener('click', async () => {
+  $('#captureAgain')?.addEventListener('click', () => $('#screen')?.click());\n  $('#clearScreen')?.addEventListener('click', () => { clearJarvisPreview(); setJarvisState('Active', 'ready for perception'); });\n\n  $('#screen')?.addEventListener('click', async () => {
     if (!(await ensureAccess())) return;
 
     try {
@@ -188,7 +188,7 @@ export function initControls({
       });
 
       if (result.text) onMessage('assistant', result.text);
-      setStatus('Screen analysis complete.');
+      setJarvisState('Active', 'analysis complete');\n      setStatus('Screen analysis complete.');
       await loadWorkspace();
     } catch (error) {
       setStatus(error.message || 'Screen capture failed.');
