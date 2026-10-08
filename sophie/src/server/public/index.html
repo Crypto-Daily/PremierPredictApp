@@ -81,7 +81,7 @@
     <div class="composer">
       <div class="box">
         <textarea id="input" placeholder="Ask Sophie anything…" rows="2" aria-label="Message Sophie"></textarea>
-        <div class="command-state" id="commandState" aria-live="polite"></div>
+        <div class="command-state" id="commandState" aria-live="polite"></div><div class="execution-strip" id="executionStrip" hidden><span class="pulse"></span><span id="executionLabel">Working</span><span class="execution-time" id="executionTime">0s</span></div>
         <div class="actions">
           <div class="action-left">
             <button class="icon" id="attach" type="button">＋ File</button>
@@ -113,7 +113,7 @@
     </div>
     <div class="card">
       <h3>Workspace artifacts</h3>
-      <div id="artifacts"><div class="empty">No artifacts loaded.</div></div>
+      <div id="artifacts"><div class="empty">No artifacts loaded.</div></div><div class="artifact-preview" id="artifactPreview" hidden><div class="preview-head"><span id="previewName"></span><button id="previewClose" type="button">×</button></div><div id="previewBody"></div></div>
     </div>
   </section>
 </div>
