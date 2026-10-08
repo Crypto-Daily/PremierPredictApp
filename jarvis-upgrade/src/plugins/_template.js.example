@@ -1,0 +1,40 @@
+'use strict';
+
+/*
+ * Sophie plugin template. Copy to src/plugins/<name>.js (no leading underscore).
+ * Files ending in .js are loaded automatically; say "reload plugins" in chat.
+ *
+ * Contract:
+ *   name         lowercase letters/numbers/dashes
+ *   description  one sentence shown in "list plugins"
+ *   requires     binaries the plugin needs (Sophie answers "tool not available" and offers
+ *                to install them if one is missing)
+ *   risk         'low'  = any signed-in user may trigger it
+ *                'high' = only while Admin is unlocked (default)
+ *   triggers     RegExps tested against the user's message; the first match runs the plugin
+ *   run(args)    async; args = { command, match, ctx }; return { text, artifacts? }
+ *
+ * ctx helpers:
+ *   ctx.workspaceRoot            absolute path of the Sophie workspace
+ *   ctx.resolveArtifact(rel)     safe path inside the workspace (throws if outside)
+ *   ctx.fetchPublic(url, opts)   guarded HTTP request (blocks internal addresses)
+ *   ctx.runCommand(cmd)          run a shell command (Admin only); returns {exitCode, stdout, stderr}
+ *   ctx.redact(text)             strip secrets from text before returning it
+ *   ctx.mimeFor(file)            mime type for a file name
+ *   ctx.admin                    true when Admin is unlocked
+ *
+ * Never read .env files or other secrets from a plugin.
+ */
+
+module.exports = {
+  name: 'example',
+  description: 'Replies with a greeting. Replace me.',
+  version: '1.0.0',
+  requires: [],
+  risk: 'low',
+  triggers: [/^example plugin$/i],
+
+  async run() {
+    return { text: 'Hello from the example plugin.' };
+  }
+};
