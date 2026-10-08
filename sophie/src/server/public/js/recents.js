@@ -40,6 +40,7 @@ export function initRecents({ api, app, refresh }) {
   const heading = document.querySelector('#nameModalTitle');
   const hint = document.querySelector('#nameModalHint');
   const cancel = document.querySelector('#nameCancel');
+  const cancelButton = document.querySelector('#nameCancelButton');
   const confirm = document.querySelector('#nameConfirm');
   let pendingType = 'chat';
 
@@ -90,6 +91,7 @@ export function initRecents({ api, app, refresh }) {
   document.querySelector('#newChat')?.addEventListener('click', () => openModal('chat'));
   document.querySelector('#newProject')?.addEventListener('click', () => openModal('project'));
   cancel?.addEventListener('click', closeModal);
+  cancelButton?.addEventListener('click', closeModal);
   form?.addEventListener('submit', event => {
     event.preventDefault();
     create();
