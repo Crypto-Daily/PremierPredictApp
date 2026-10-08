@@ -92,6 +92,7 @@ export function initControls({
   app,
   ensureAccess,
   loadWorkspace,
+  onUpload,
   onMessage,
   setStatus,
   setMode
@@ -189,6 +190,12 @@ export function initControls({
           data: parts.data
         });
         setStatus('Uploaded: ' + result.name);
+        onUpload?.({
+          name: result.name || file.name,
+          size: result.size || file.size,
+          mimeType: result.mimeType || parts.mimeType,
+          path: result.path || ''
+        });
         await loadWorkspace();
       } catch (error) {
         setStatus('Upload failed: ' + (error.message || 'Unknown error.'));
