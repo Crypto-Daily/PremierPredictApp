@@ -24,13 +24,13 @@ function escapeHtml(value) {
 }
 
 function formatAnswer(text) {
-  let value = escapeHtml(text).replace(/\\r?\\n/g, '\n');
-  value = value.replace(/^#{1,3}\\s+(.+)$/gm, '<h3>$1</h3>');
-  value = value.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+  let value = escapeHtml(text).replace(/\r?\n/g, '\n');
+  value = value.replace(/^#{1,3}\s+(.+)$/gm, '<h3>$1</h3>');
+  value = value.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   value = value.replace(/__([^_]+)__/g, '<strong>$1</strong>');
-  value = value.replace(/^[-•]\\s+(.+)$/gm, '<li>$1</li>');
-  value = value.replace(/(?:<li>.*<\\/li>\\n?)+/g, match => '<ul>' + match.replace(/\\n/g, '') + '</ul>');
-  return value.replace(/\\n{2,}/g, '<br><br>').replace(/\\n/g, '<br>');
+  value = value.replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
+  value = value.replace(/(?:<li>.*<\/li>\n?)+/g, match => '<ul>' + match.replace(/\n/g, '') + '</ul>');
+  return value.replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>');
 }
 
 function addActions(node, role, text) {
