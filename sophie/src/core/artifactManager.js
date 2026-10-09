@@ -50,7 +50,18 @@ function walk(dir, results = []) {
   return results;
 }
 
-function listArtifacts() { ensureWorkspace(); return walk(WORKSPACE_ROOT).sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt)); }
+const USER_DELIVERABLE_EXTENSIONS = new Set([
+  '.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.csv', '.txt', '.md', '.json', '.zip', '.mp3', '.wav', '.mp4', '.webm'
+]);
+
+function listArtifacts() {
+  ensureWorkspace();
+  return walk(WORKSPACE_ROOT)
+    .filter(file => USER_DELIVERABLE_EXTENSIONS.has(path.extname(file.path).toLowerCase()))
+    .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+}
 function snapshot() { return new Map(listArtifacts().map(file => [file.path, file.size + ':' + file.modifiedAt])); }
 function diff(before) {
   return listArtifacts().filter(file => {
