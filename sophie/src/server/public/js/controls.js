@@ -194,7 +194,7 @@ export function initControls({
           name: result.name || file.name,
           size: result.size || file.size,
           mimeType: result.mimeType || parts.mimeType,
-          path: result.path || '',
+          path: result.absolutePath || result.path || '',
           previewUrl: String(parts.mimeType || '').startsWith('image/') ? dataUrl : ''
         });
         await loadWorkspace();
