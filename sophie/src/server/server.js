@@ -550,6 +550,7 @@ app.post('/api/upload', (req, res) => {
       ok: true,
       name: path.basename(target),
       path: path.relative(WORKSPACE_ROOT, target).split(path.sep).join('/'),
+      absolutePath: target,
       size: decoded.length,
       mimeType: mimeType || 'application/octet-stream'
     });
