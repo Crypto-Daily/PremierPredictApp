@@ -377,7 +377,7 @@ async function send() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         command: text + (attachments.length
-          ? '\n\nUSER ATTACHMENTS (inspect these files and answer the user's question about their contents):\n' +
+          ? '\n\nUSER ATTACHMENTS (inspect these files and answer the user question about their contents):\n' +
             attachments.map(file => '- ' + file.name + ' — workspace path: ' + file.path).join('\n')
           : ''),
         requestId
