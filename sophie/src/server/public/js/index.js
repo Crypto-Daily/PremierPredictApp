@@ -377,8 +377,8 @@ async function send() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         command: text + (attachments.length
-          ? '\\n\\nUSER ATTACHMENTS (inspect these files and answer the user's question about their contents):\\n' +
-            attachments.map(file => '- ' + file.name + ' — workspace path: ' + file.path).join('\\n')
+          ? '\n\nUSER ATTACHMENTS (inspect these files and answer the user's question about their contents):\n' +
+            attachments.map(file => '- ' + file.name + ' — workspace path: ' + file.path).join('\n')
           : ''),
         requestId
       })
@@ -391,6 +391,39 @@ async function send() {
       (result.data ? JSON.stringify(result.data, null, 2) : JSON.stringify(result, null, 2));
 
     activeOutput.querySelector('.body').innerHTML = formatAnswer(answer);
+    const deliverables = Array.isArray(result.artifacts) ? result.artifacts : [];
+    if (deliverables.length) {
+      const gallery = document.createElement('div');
+      gallery.className = 'assistant-artifacts';
+      deliverables.forEach(item => {
+        const rawPath = typeof item === 'string' ? item : (item.path || item.name || '');
+        if (!rawPath) return;
+        const name = typeof item === 'string' ? rawPath.split('/').pop() : (item.name || rawPath.split('/').pop());
+        const url = '/api/artifacts/download?path=' + encodeURIComponent(rawPath);
+        const card = document.createElement('a');
+        card.className = 'assistant-artifact';
+        card.href = url;
+        card.target = '_blank';
+        card.rel = 'noopener';
+        const ext = rawPath.split('.').pop().toLowerCase();
+        if (['png','jpg','jpeg','webp','gif','svg'].includes(ext)) {
+          const image = document.createElement('img');
+          image.src = url;
+          image.alt = name;
+          card.appendChild(image);
+        } else {
+          const icon = document.createElement('span');
+          icon.className = 'assistant-artifact-icon';
+          icon.textContent = ext === 'pdf' ? 'PDF' : 'FILE';
+          card.appendChild(icon);
+        }
+        const label = document.createElement('span');
+        label.textContent = name;
+        card.appendChild(label);
+        gallery.appendChild(card);
+      });
+      if (gallery.childElementCount) activeOutput.appendChild(gallery);
+    }
     activeOutput.querySelector('.msg-actions')?.remove();
     addActions(activeOutput, 'assistant', answer);
   } catch (error) {
