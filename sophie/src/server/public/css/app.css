@@ -144,3 +144,17 @@ body.modal-open{overflow:hidden}
   .upload-file-info b{max-width:calc(100vw - 125px)}
   .name-dialog{padding:22px}
 }
+
+
+/* Chat-style attachment previews */
+.upload-tray{width:100%;margin:0 0 10px;padding:0;border:0;background:transparent;backdrop-filter:none}
+.upload-tray-head{margin:0 0 6px}
+.upload-list{display:flex;gap:9px;flex-wrap:wrap}
+.upload-item{width:min(100%,220px);min-width:0;position:relative;display:flex;align-items:center;gap:8px;padding:8px 36px 8px 8px;border:1px solid var(--line);border-radius:12px;background:#111a27}
+.upload-thumb{width:48px;height:48px;object-fit:cover;border-radius:8px;flex:none}
+.message-attachments{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.message-attachment{display:flex;flex-direction:column;gap:6px;width:min(220px,70%);min-width:0;padding:6px;border:1px solid #2b394d;background:#0c121c;border-radius:12px;overflow:hidden}
+.message-attachment img{display:block;width:100%;max-height:260px;object-fit:contain;border-radius:8px;background:#070a10}
+.message-attachment>span:last-child{font-size:12px;color:#aebbd0;overflow-wrap:anywhere;padding:2px 4px}
+.message-file-icon{font-size:24px;padding:16px}
+@media(max-width:650px){.message-attachment{width:min(190px,76%)}.message-attachment img{max-height:220px}}
