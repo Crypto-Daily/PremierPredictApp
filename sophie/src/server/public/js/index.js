@@ -100,6 +100,31 @@ function msg(role, text, options = {}) {
     (role === 'user' ? 'YOU' : 'SOPHIE') +
     '</div><div class="body"></div>';
 
+  if (role === 'user' && Array.isArray(options.attachments) && options.attachments.length) {
+    const attachments = document.createElement('div');
+    attachments.className = 'message-attachments';
+    options.attachments.forEach(file => {
+      const card = document.createElement('div');
+      card.className = 'message-attachment';
+      if (file.previewUrl && String(file.mimeType || '').startsWith('image/')) {
+        const image = document.createElement('img');
+        image.src = file.previewUrl;
+        image.alt = file.name || 'Attached image';
+        card.appendChild(image);
+      } else {
+        const icon = document.createElement('span');
+        icon.className = 'message-file-icon';
+        icon.textContent = '↳';
+        card.appendChild(icon);
+      }
+      const label = document.createElement('span');
+      label.textContent = file.name || 'Attachment';
+      card.appendChild(label);
+      attachments.appendChild(card);
+    });
+    node.appendChild(attachments);
+  }
+
   const body = node.querySelector('.body');
   body.innerHTML = role === 'assistant' && options.plain !== true
     ? formatAnswer(text)
@@ -204,8 +229,11 @@ function renderUploads(files = []) {
     const name = escapeHtml(file.name || 'Uploaded file');
     const size = file.size ? formatFileSize(file.size) : '';
     const type = escapeHtml(file.mimeType || file.type || 'file');
+    const icon = file.previewUrl && String(file.mimeType || '').startsWith('image/')
+      ? '<img class="upload-thumb" src="' + file.previewUrl + '" alt="">'
+      : '<span class="upload-file-icon">↳</span>';
     return '<div class="upload-item">' +
-      '<span class="upload-file-icon">↳</span>' +
+      icon +
       '<div class="upload-file-info"><b>' + name + '</b><small>' + type + (size ? ' · ' + size : '') + '</small></div>' +
       '<button class="upload-remove" type="button" data-upload-index="' + index + '" aria-label="Remove ' + name + '" title="Remove">×</button>' +
       '</div>';
@@ -316,8 +344,10 @@ async function pollCommand(requestId) {
 
 async function send() {
   const text = input.value.trim();
-  if (!text || getState().command.running) return;
+  if ((!text && !uploadedFiles.length) || getState().command.running) return;
 
+  const attachments = uploadedFiles.splice(0, uploadedFiles.length);
+  renderUploads();
   input.value = '';
   input.style.height = '';
   const requestId = crypto.randomUUID();
@@ -336,7 +366,7 @@ async function send() {
   $('#send').setAttribute('aria-label', 'Stop Sophie');
   setStatus('Planning the task…');
 
-  msg('user', text);
+  msg('user', text || 'Please analyze the attached file.', { attachments });
   activeOutput = msg('assistant', 'Planning and executing…', { plain: true });
   pipeline(0);
   pollCommand(requestId);
@@ -345,7 +375,13 @@ async function send() {
     const result = await api('/api/command', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: text, requestId })
+      body: JSON.stringify({
+        command: text + (attachments.length
+          ? '\\n\\nUSER ATTACHMENTS (inspect these files and answer the user's question about their contents):\\n' +
+            attachments.map(file => '- ' + file.name + ' — workspace path: ' + file.path).join('\\n')
+          : ''),
+        requestId
+      })
     });
 
     pipeline(8);
