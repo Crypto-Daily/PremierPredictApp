@@ -59,7 +59,7 @@ const USER_DELIVERABLE_EXTENSIONS = new Set([
 function listArtifacts() {
   ensureWorkspace();
   return walk(WORKSPACE_ROOT)
-    .filter(file => USER_DELIVERABLE_EXTENSIONS.has(path.extname(file.path).toLowerCase()))
+    .filter(file => !file.path.startsWith('attachments/') && USER_DELIVERABLE_EXTENSIONS.has(path.extname(file.path).toLowerCase()))
     .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
 }
 function snapshot() { return new Map(listArtifacts().map(file => [file.path, file.size + ':' + file.modifiedAt])); }
