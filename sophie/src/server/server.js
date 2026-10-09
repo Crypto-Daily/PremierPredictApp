@@ -522,19 +522,20 @@ app.post('/api/upload', (req, res) => {
       return res.status(413).json({ error: 'File exceeds the 8 MB upload limit.' });
     }
 
-    fs.mkdirSync(WORKSPACE_ROOT, { recursive: true });
+    const uploadRoot = path.join(WORKSPACE_ROOT, 'attachments');
+    fs.mkdirSync(uploadRoot, { recursive: true });
 
     const original = path.basename(String(name || 'upload.bin'));
     const safeName =
       original.replace(/[^a-zA-Z0-9._ ()-]/g, '_').slice(0, 180) ||
       'upload.bin';
 
-    let target = path.join(WORKSPACE_ROOT, safeName);
+    let target = path.join(uploadRoot, safeName);
 
     if (fs.existsSync(target)) {
       const ext = path.extname(safeName);
       const stem = path.basename(safeName, ext);
-      target = path.join(WORKSPACE_ROOT, stem + '-' + Date.now() + ext);
+      target = path.join(uploadRoot, stem + '-' + Date.now() + ext);
     }
 
     fs.writeFileSync(target, decoded);
