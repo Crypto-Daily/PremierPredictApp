@@ -158,3 +158,12 @@ body.modal-open{overflow:hidden}
 .message-attachment>span:last-child{font-size:12px;color:#aebbd0;overflow-wrap:anywhere;padding:2px 4px}
 .message-file-icon{font-size:24px;padding:16px}
 @media(max-width:650px){.message-attachment{width:min(190px,76%)}.message-attachment img{max-height:220px}}
+
+
+/* Deliverables appear inline with the assistant response */
+.assistant-artifacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,220px));gap:10px;margin:12px 0 4px}
+.assistant-artifact{display:flex;flex-direction:column;gap:8px;min-width:0;padding:8px;border:1px solid var(--line);border-radius:13px;background:#0c121c;color:var(--text);text-decoration:none;overflow:hidden}
+.assistant-artifact img{display:block;width:100%;max-height:320px;object-fit:contain;border-radius:8px;background:#06080c}
+.assistant-artifact>span:last-child{font-size:12px;overflow-wrap:anywhere;color:#c6d2e3}
+.assistant-artifact-icon{display:flex;align-items:center;justify-content:center;min-height:88px;border-radius:8px;background:#121c2a;color:#9bbcff;font-size:18px;font-weight:800;letter-spacing:.08em}
+@media(max-width:650px){.assistant-artifacts{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}.assistant-artifact img{max-height:260px}}
