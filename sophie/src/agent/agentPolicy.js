@@ -9,8 +9,6 @@ function shouldDelegateToHermes({ command, intent }) {
   const text = String(command || '').trim();
   if (!text) return false;
   if (LOCAL_ONLY_INTENTS.has(intent)) return false;
-  // Explicit requests to use Hermes are always honored.
-  if (/\\b(use hermes|ask hermes|tell hermes|let hermes|delegate to hermes)\\b/i.test(text)) return true;
   // Default route: Hermes receives every other request, regardless of GPT/Jarvis mode.
   return true;
 }
