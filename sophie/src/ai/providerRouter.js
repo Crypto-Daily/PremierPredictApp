@@ -98,7 +98,7 @@ async function askOpenRouter(userMessage, systemInstruction) {
 // Meta AI bridge: OpenAI-compatible local HTTP endpoint backed by the existing
 // WhatsApp/whatsmeow bridge. META_AI_BASE_URL is the API base (default ends in /v1).
 async function askMetaAI(userMessage, systemInstruction) {
-  const baseUrl = (process.env.META_AI_BASE_URL || 'http://127.0.0.1:8788/v1').replace(/\\/+$/, '');
+  const baseUrl = (process.env.META_AI_BASE_URL || 'http://127.0.0.1:8788/v1').replace(/\/+$/, '');
   const endpoint = new URL(baseUrl + '/chat/completions');
   const transport = endpoint.protocol === 'https:' ? https : http;
   const model = process.env.META_AI_MODEL || 'meta-ai';
