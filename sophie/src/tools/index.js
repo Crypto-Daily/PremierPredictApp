@@ -15,6 +15,7 @@ const recoveryTool = require('./recoveryTool');
 const plannerTool = require('./plannerTool');
 const executionTool = require('./executionTool');
 const multimodalWorkspaceTool = require('./multimodalWorkspaceTool');
+const modelRuntimeTool = require('./modelRuntimeTool');
 
 registerTool(hermesTool);
 registerTool(nexusTool);
@@ -30,5 +31,6 @@ registerTool(recoveryTool);
 registerTool(plannerTool);
 registerTool(executionTool);
 registerTool(multimodalWorkspaceTool);
+registerTool(modelRuntimeTool);
 
 module.exports = { registerTool, getTool, listTools, describeTool };
