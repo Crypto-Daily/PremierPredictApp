@@ -55,6 +55,7 @@ async function invokeModel({ modelId, prompt, system = 'You are a helpful assist
       method: 'POST',
       headers,
       signal: controller.signal,
+      redirect: 'error',
       body: JSON.stringify({
         model: model.model,
         messages: [
