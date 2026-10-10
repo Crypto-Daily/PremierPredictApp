@@ -1,0 +1,5 @@
+# WhatsApp authentication/session state is local runtime data and must never be committed.
+wametaai.db
+wametaai.db-*
+*.sqlite
+*.sqlite3
