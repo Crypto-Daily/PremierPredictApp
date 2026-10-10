@@ -50,6 +50,12 @@ function renderModels() {
     edit.type = 'button';
     edit.addEventListener('click', () => beginEdit(model));
     actions.append(edit);
+    if (model.adapter === 'openai-compatible') {
+      const test = el('button', '', 'Test connection');
+      test.type = 'button';
+      test.addEventListener('click', () => testModel(model, test));
+      actions.append(test);
+    }
     if (model.id !== 'hermes-agent') {
       const remove = el('button', '', 'Remove');
       remove.type = 'button';
@@ -110,6 +116,26 @@ function resetForm() {
   $('#saveModel').textContent = 'Add model';
   $('#cancelEdit').hidden = true;
   setMessage('');
+}
+
+async function testModel(model, button) {
+  button.disabled = true;
+  const previous = button.textContent;
+  button.textContent = 'Testing…';
+  setMessage('Testing ' + model.name + ' connection…');
+  try {
+    const result = await api('/api/models/' + encodeURIComponent(model.id) + '/test', { method: 'POST' });
+    if (result.verified) {
+      setMessage(model.name + ' connection verified (' + result.model + ').');
+    } else {
+      setMessage(model.name + ' responded, but the exact verification phrase did not match.', true);
+    }
+  } catch (error) {
+    setMessage('Test failed for ' + model.name + ': ' + error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = previous;
+  }
 }
 
 async function removeModel(model) {
