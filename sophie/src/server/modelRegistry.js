@@ -67,6 +67,26 @@ function cleanModel(input, existing = {}) {
 }
 
 function modelRoutes(app) {
+  app.post('/api/models/:id/test', async (req, res) => {
+    try {
+      const { testModel } = require('../models/modelRuntime');
+      const result = await testModel(req.params.id);
+      res.json(result);
+    } catch (error) {
+      res.status(502).json({ ok: false, error: String(error.message || 'Model test failed.').slice(0, 600) });
+    }
+  });
+
+  app.post('/api/models/:id/invoke', async (req, res) => {
+    try {
+      const { invokeModel } = require('../models/modelRuntime');
+      const result = await invokeModel({ modelId: req.params.id, prompt: req.body?.prompt, system: req.body?.system, timeoutMs: req.body?.timeoutMs });
+      res.json(result);
+    } catch (error) {
+      res.status(502).json({ ok: false, error: String(error.message || 'Model invocation failed.').slice(0, 600) });
+    }
+  });
+
   app.get('/api/models', (req, res) => {
     try {
       const registry = readRegistry();
