@@ -45,7 +45,26 @@ assert.strictEqual(
 
 assert.strictEqual(
   shouldDelegateToHermes({ command: 'what is the capital of France?', intent: 'CHAT', mode: 'GPT' }),
-  false
+  true,
+  'ordinary GPT-mode chat must reach Hermes first'
+);
+
+assert.strictEqual(
+  shouldDelegateToHermes({ command: 'generate an image', intent: 'CREATION', mode: 'GPT' }),
+  true,
+  'creation requests must reach Hermes first'
+);
+
+assert.strictEqual(
+  shouldDelegateToHermes({ command: 'show me your source code', intent: 'SELF_INSPECT', mode: 'GPT' }),
+  false,
+  'protected local self-inspection stays in Sophie'
+);
+
+assert.strictEqual(
+  shouldDelegateToHermes({ command: 'modify your own code', intent: 'SELF_UPGRADE', mode: 'JARVIS' }),
+  false,
+  'self-upgrade stays behind Sophie's protected workflow'
 );
 
 assert.strictEqual(
