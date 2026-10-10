@@ -8,3 +8,9 @@ workspace/
 *.before-*
 *.backup
 *.bak
+
+# WhatsApp / whatsmeow authentication and session databases — never commit
+wametaai.db
+wametaai.db-*
+*.sqlite
+*.sqlite3
