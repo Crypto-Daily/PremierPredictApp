@@ -43,6 +43,8 @@ mcp_servers:
   sophie_models:
     command: "node"
     args: ["/home/ubuntu/sophie/src/models/mcpServer.js"]
+    env:
+      SOPHIE_MODEL_REGISTRY: "/home/ubuntu/sophie/data/model-registry.json"
     timeout: 90
     connect_timeout: 10
 ```
