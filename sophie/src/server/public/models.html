@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#06080c"><title>Model Studio — Sophie</title>
+<link rel="stylesheet" href="/css/app.css">
+<style>
+.model-page{max-width:1180px;margin:0 auto;padding:28px 20px 60px}.model-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}.model-top h1{margin:0;font-size:28px}.model-top p{color:#9caec5;margin:8px 0 0}.model-layout{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:18px}.model-card{border:1px solid var(--line,#273448);background:var(--panel,#0c121c);border-radius:16px;padding:18px;min-width:0}.model-card h2{font-size:16px;margin:0 0 16px}.model-form{display:grid;gap:12px}.model-form label{display:grid;gap:6px;color:#aebbd0;font-size:12px}.model-form input,.model-form select,.model-form textarea{width:100%;box-sizing:border-box;padding:10px 11px;border:1px solid #2c3b50;border-radius:9px;background:#070b12;color:#eef4ff;font:inherit}.model-form textarea{min-height:72px;resize:vertical}.model-actions{display:flex;gap:8px;flex-wrap:wrap}.model-actions button,.model-button{border:1px solid #344760;background:#142237;color:#e8f1ff;padding:9px 12px;border-radius:9px;cursor:pointer}.model-actions .primary{background:#b9d4ff;color:#07101c;border-color:#b9d4ff;font-weight:700}.model-list{display:grid;gap:10px}.model-item{border:1px solid #25354a;border-radius:12px;padding:14px;display:grid;gap:9px}.model-item-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.model-item h3{margin:0;font-size:15px}.model-meta{font-size:12px;color:#a8b7cc;overflow-wrap:anywhere}.model-tags{display:flex;gap:6px;flex-wrap:wrap}.model-tag{font-size:11px;padding:4px 7px;border:1px solid #30425a;border-radius:999px;color:#c6d5e9}.model-status{font-size:11px;color:#9ddbb4}.model-status.off{color:#f1c28a}.model-empty,.model-note{font-size:12px;color:#9caec5;line-height:1.6}.model-message{min-height:18px;font-size:13px;color:#9ddbb4}.model-message.error{color:#ffaaa6}.model-login{max-width:360px;margin:12vh auto;padding:24px;border:1px solid #2c3b50;border-radius:16px;background:#0c121c}.model-login input{box-sizing:border-box;width:100%;padding:12px;margin:10px 0;background:#070b12;color:#fff;border:1px solid #2c3b50;border-radius:8px}.model-login button{padding:10px 14px;border-radius:8px}.model-login .loginerr{color:#ffaaa6;font-size:13px;margin-top:10px}@media(max-width:800px){.model-layout{grid-template-columns:1fr}.model-page{padding:20px 12px 40px}}
+</style>
+</head>
+<body>
+<div id="login" class="model-login" hidden>
+<h2>Unlock Sophie</h2><p>Sign in to manage the model registry.</p>
+<input id="accessPassword" type="password" autocomplete="current-password" placeholder="Access password">
+<button id="loginBtn" type="button"><span id="loginBtnText">Unlock</span></button>
+<div id="loginErr" class="loginerr" role="status" aria-live="polite"></div>
+</div>
+<main class="model-page" id="modelApp" hidden>
+<header class="model-top"><div><h1>Model Studio</h1><p>Register and manage models and adapters available to Sophie's orchestration layer.</p></div><div class="model-actions"><a class="model-button" href="/">← Back to Sophie</a><button class="model-button" id="refreshModels" type="button">Refresh</button></div></header>
+<div class="model-layout">
+<section class="model-card">
+<h2 id="formTitle">Add a model</h2>
+<form class="model-form" id="modelForm">
+<label>Display name<input name="name" required maxlength="100" placeholder="e.g. Flux Image Pro"></label>
+<label>Provider / service<input name="provider" required maxlength="100" placeholder="e.g. FAL, Hugging Face, local"></label>
+<label>Model ID<input name="model" required maxlength="180" placeholder="Provider's exact model identifier"></label>
+<label>Adapter type<select name="adapter"><option value="metadata-only">Metadata only (register first)</option><option value="hermes-cli">Hermes CLI</option><option value="openai-compatible">OpenAI-compatible API</option><option value="provider-router">Existing Sophie provider adapter</option></select></label>
+<label>Endpoint URL (optional)<input name="endpoint" type="url" placeholder="https://api.example.com/v1"></label>
+<label>Credential environment variable name (optional)<input name="envKey" maxlength="100" placeholder="e.g. FAL_KEY — never enter the secret itself"></label>
+<label>Capabilities (comma-separated)<input name="capabilities" placeholder="text, image, video, vision, audio" value="text"></label>
+<label>Notes<textarea name="notes" maxlength="1000" placeholder="Purpose, constraints, or setup notes"></textarea></label>
+<label><span><input name="enabled" type="checkbox" checked style="width:auto"> Enabled in registry</span></label>
+<div class="model-actions"><button class="primary" type="submit" id="saveModel">Add model</button><button type="button" id="cancelEdit" hidden>Cancel edit</button></div>
+<div id="formMessage" class="model-message" role="status" aria-live="polite"></div>
+</form>
+<p class="model-note">This registry stores model metadata, not API keys. Adding an entry makes it discoverable; it does not automatically implement an unsupported provider or guarantee that the model can run. Use a supported adapter or add an adapter implementation.</p>
+</section>
+<section class="model-card">
+<h2>Registered models</h2><div id="modelCount" class="model-note"></div><div id="modelList" class="model-list"><div class="model-empty">Loading models…</div></div>
+</section>
+</div>
+</main>
+<script type="module" src="/js/models.js"></script>
+</body></html>
