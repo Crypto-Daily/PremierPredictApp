@@ -9,10 +9,13 @@ const { executeLoop } = require('../nexus/executionLoop');
 const { createAutonomousTask } = require('../nexus/autonomy');
 const { authorizeAutonomousAction } = require('../nexus/approvalGate');
 const { recover } = require('../nexus/recovery');
+const { readRegistry } = require('../server/modelRegistry');
 
 function buildHermesTask({ command, mode, intent, memoryFacts = [], conversation = [], research = [], timeContext = null }) {
   const nexus = prepareRequest({ command, intent, mode, memoryFacts, conversation, research, timeContext });
   const toolPlan = buildToolPlan({ command, intent, mode });
+  let availableModels = [];
+  try { availableModels = readRegistry().models.filter(model => model.enabled); } catch (error) { console.error('[MODELS] Registry unavailable to Hermes:', error.message); }
 
   return [
     'You are Hermes, the execution engine behind Sophie/NEXUS-OMEGA.',
@@ -21,6 +24,11 @@ function buildHermesTask({ command, mode, intent, memoryFacts = [], conversation
     'Never claim completion without verification.',
     'Never request, reveal, store or use SOPHIE_ADMIN_PASSCODE.',
     'Do not modify Sophie source code or security controls; self-upgrade remains protected by Sophie.',
+    '',
+    'MODEL SELECTION POLICY:',
+    'Use the registered model catalog below to discover available model/provider capabilities. Hermes remains the primary agent and chooses the best available tool/model for the request.',
+    'A registry entry is metadata, not proof that a provider is callable. Use only adapters/tools actually configured and verify the result. If a requested model is not executable yet, say so instead of pretending to use it.',
+    JSON.stringify(availableModels, null, 2),
     '',
     'NEXUS TOOL PLAN:',
     JSON.stringify(toolPlan, null, 2),
