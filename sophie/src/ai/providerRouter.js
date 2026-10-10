@@ -1,8 +1,9 @@
 require('dotenv').config();
 
 const https = require('https');
+const http = require('http');
 
-const PROVIDER_PRIORITY = ['Gemini', 'Groq', 'OpenRouter', 'NVIDIA'];
+const PROVIDER_PRIORITY = ['Gemini', 'OpenRouter', 'Meta AI'];
 
 function postJson(hostname, path, headers, body) {
   return new Promise((resolve, reject) => {
@@ -66,29 +67,6 @@ function postJson(hostname, path, headers, body) {
   });
 }
 
-async function askGroq(userMessage, systemInstruction) {
-  const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
-
-  console.log(`[GROQ] Model: ${model}`);
-
-  const result = await postJson(
-    'api.groq.com',
-    '/openai/v1/chat/completions',
-    { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-    {
-      model,
-      messages: [
-        { role: 'system', content: systemInstruction },
-        { role: 'user', content: userMessage }
-      ],
-      temperature: 0.3,
-      max_tokens: 4096
-    }
-  );
-
-  return result.choices?.[0]?.message?.content || '';
-}
-
 async function askOpenRouter(userMessage, systemInstruction) {
   const model = process.env.OPENROUTER_MODEL || 'google/gemini-3.8-flash';
 
@@ -116,27 +94,65 @@ async function askOpenRouter(userMessage, systemInstruction) {
   return result.choices?.[0]?.message?.content || '';
 }
 
-async function askNvidia(userMessage, systemInstruction) {
-  const model = process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct';
 
-  console.log(`[NVIDIA] Model: ${model}`);
+// Meta AI bridge: OpenAI-compatible local HTTP endpoint backed by the existing
+// WhatsApp/whatsmeow bridge. META_AI_BASE_URL is the API base (default ends in /v1).
+async function askMetaAI(userMessage, systemInstruction) {
+  const baseUrl = (process.env.META_AI_BASE_URL || 'http://127.0.0.1:8788/v1').replace(/\\/+$/, '');
+  const endpoint = new URL(baseUrl + '/chat/completions');
+  const transport = endpoint.protocol === 'https:' ? https : http;
+  const model = process.env.META_AI_MODEL || 'meta-ai';
+  const body = JSON.stringify({
+    model,
+    messages: [
+      { role: 'system', content: systemInstruction },
+      { role: 'user', content: userMessage }
+    ],
+    temperature: 0.3,
+    max_tokens: 2048
+  });
 
-  const result = await postJson(
-    'integrate.api.nvidia.com',
-    '/v1/chat/completions',
-    { Authorization: `Bearer ${process.env.NVIDIA_API_KEY}` },
-    {
-      model,
-      messages: [
-        { role: 'system', content: systemInstruction },
-        { role: 'user', content: userMessage }
-      ],
-      temperature: 0.3,
-      max_tokens: 4096
-    }
-  );
+  console.log(`[META AI] Model: ${model} | Endpoint: ${endpoint.origin}`);
 
-  return result.choices?.[0]?.message?.content || '';
+  const result = await new Promise((resolve, reject) => {
+    const req = transport.request(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        ...(process.env.META_AI_API_KEY ? { Authorization: `Bearer ${process.env.META_AI_API_KEY}` } : {})
+      },
+      timeout: Number(process.env.META_AI_TIMEOUT_MS || 30000)
+    }, res => {
+      let response = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => { response += chunk; });
+      res.on('end', () => {
+        let json;
+        try { json = JSON.parse(response); } catch { json = { raw: response }; }
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(json);
+          return;
+        }
+        const error = new Error(
+          json?.error?.message || json?.message || `HTTP ${res.statusCode}`
+        );
+        error.status = res.statusCode;
+        error.providerResponse = json;
+        reject(error);
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('Request timeout')));
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+
+  const content = result.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    throw new Error('Meta AI bridge returned an empty or unsupported response');
+  }
+  return content;
 }
 
 function buildProviders(userMessage, systemInstruction, options) {
@@ -154,13 +170,6 @@ function buildProviders(userMessage, systemInstruction, options) {
     });
   }
 
-  if (process.env.GROQ_API_KEY) {
-    providers.push({
-      name: 'Groq',
-      run: () => askGroq(userMessage, systemInstruction)
-    });
-  }
-
   if (process.env.OPENROUTER_API_KEY) {
     providers.push({
       name: 'OpenRouter',
@@ -168,10 +177,12 @@ function buildProviders(userMessage, systemInstruction, options) {
     });
   }
 
-  if (process.env.NVIDIA_API_KEY) {
+  // The bridge is optional at runtime; if it is offline, normal fallback handling
+  // records the error and reports it if every provider fails.
+  if (process.env.META_AI_ENABLED !== 'false') {
     providers.push({
-      name: 'NVIDIA',
-      run: () => askNvidia(userMessage, systemInstruction)
+      name: 'Meta AI',
+      run: () => askMetaAI(userMessage, systemInstruction)
     });
   }
 
