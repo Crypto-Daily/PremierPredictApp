@@ -64,7 +64,7 @@ assert.strictEqual(
 assert.strictEqual(
   shouldDelegateToHermes({ command: 'modify your own code', intent: 'SELF_UPGRADE', mode: 'JARVIS' }),
   false,
-  'self-upgrade stays behind Sophie's protected workflow'
+    "self-upgrade stays behind Sophie's protected workflow"
 );
 
 assert.strictEqual(

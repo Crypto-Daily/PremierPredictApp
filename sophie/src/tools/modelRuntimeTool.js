@@ -4,7 +4,7 @@ const { invokeModel, testModel } = require('../models/modelRuntime');
 
 module.exports = {
   name: 'invoke_model',
-  description: 'Invoke a registered enabled OpenAI-compatible model through Sophie's model runtime.',
+  description: "Invoke a registered enabled OpenAI-compatible model through Sophie's model runtime.",
   capabilities: ['model_inference', 'text', 'vision'],
   risk: 'medium',
   async execute(input = {}) {

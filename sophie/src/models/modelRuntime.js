@@ -3,7 +3,7 @@
 const net = require('node:net');
 const { readRegistry } = require('../server/modelRegistry');
 
-const DEFAULT_TIMEOUT_MS = 30000;
+const DEFAULT_TIMEOUT_MS = 120000;
 const MAX_PROMPT_CHARS = 40000;
 
 function validateEndpoint(raw) {
@@ -43,7 +43,7 @@ async function invokeModel({ modelId, prompt, system = 'You are a helpful assist
   const base = endpoint.replace(/\/$/, '');
   const url = base.endsWith('/chat/completions') ? base : base + '/chat/completions';
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Math.min(Math.max(Number(timeoutMs) || DEFAULT_TIMEOUT_MS, 1000), 60000));
+  const timeout = setTimeout(() => controller.abort(), Math.min(Math.max(Number(timeoutMs) || DEFAULT_TIMEOUT_MS, 1000), 180000));
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (model.envKey) {
@@ -84,7 +84,7 @@ async function invokeModel({ modelId, prompt, system = 'You are a helpful assist
 }
 
 async function testModel(modelId) {
-  const result = await invokeModel({ modelId, system: 'You are a connection test. Follow the user instruction exactly.', prompt: 'Reply with exactly: MODEL_RUNTIME_OK', timeoutMs: 15000 });
+  const result = await invokeModel({ modelId, system: 'You are a connection test. Follow the user instruction exactly.', prompt: 'Reply with exactly: MODEL_RUNTIME_OK', timeoutMs: 120000 });
   return { ok: true, modelId: result.modelId, provider: result.provider, model: result.model, response: result.text, verified: result.text.trim() === 'MODEL_RUNTIME_OK' };
 }
 
