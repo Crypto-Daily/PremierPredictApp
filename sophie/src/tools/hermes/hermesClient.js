@@ -8,7 +8,11 @@ const HERMES_BIN =
 const DEFAULT_TIMEOUT_MS = 600000;
 const DEFAULT_MAX_CONTINUATIONS = 1;
 const MAX_OUTPUT_CHARS = 500000;
-const DEFAULT_TOOLSETS = process.env.HERMES_TOOLSETS || 'hermes-cli';
+// Leave Hermes' toolset selection to its own config by default. Forcing
+// `hermes-cli` can hide configured MCP servers such as `sophie_models`, which
+// means Hermes receives the model catalog in its prompt but cannot invoke it.
+// Set HERMES_TOOLSETS explicitly only when intentionally restricting tools.
+const DEFAULT_TOOLSETS = process.env.HERMES_TOOLSETS || '';
 
 function buildHermesEnv() {
   const env = { ...process.env };
@@ -129,11 +133,13 @@ function runHermesOnce(query, options = {}) {
     args.push('--model', options.model);
   }
 
-  const toolsets = options.toolsets || DEFAULT_TOOLSETS;
+  const toolsets = options.toolsets ?? DEFAULT_TOOLSETS;
 
   if (toolsets) {
     args.push('--toolsets', toolsets);
   }
+
+  console.log(`[HERMES] Toolsets: ${toolsets || '(Hermes configured defaults)'}`);
 
   if (options.resumeSessionId) {
     args.push('--resume', options.resumeSessionId);
