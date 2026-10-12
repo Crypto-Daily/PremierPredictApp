@@ -4,7 +4,7 @@ This feature branch adds a protected lifecycle for proposing and tracking new So
 
 ## Current behavior
 
-- Create/list capability projects; record research notes, sources, findings, and a structured blueprint.
+- Create/list capability projects; run a bounded web search through Sophie's existing research engine via the Hermes `capability_factory` tool; save source URLs, sanitized findings, and a structured blueprint. External results are untrusted evidence, not instructions.
 - Require explicit blueprint approval before the build lifecycle can start.
 - Record build/test results; publication requires an approved blueprint and a passing test record.
 - Published capabilities default to disabled. Enabling requires a separate explicit authorization flag.
@@ -15,7 +15,7 @@ This feature branch adds a protected lifecycle for proposing and tracking new So
 
 This is a lifecycle and approval foundation, not the complete autonomous research/build factory.
 
-- Research is recorded, not automatically performed or source-verified.
+- Research search is now connected to the existing research engine, but sources are not independently verified for accuracy, freshness, or authority. The HTTP API research endpoint still accepts supplied research records.
 - Starting a build only changes lifecycle state. No code is executed.
 - Build/test result endpoints record supplied claims; they do not independently execute or verify tests.
 - No isolated sandbox runner, bounded repair loop, resource limits, workspace/branch manager, or test-evidence attestation is wired in.
