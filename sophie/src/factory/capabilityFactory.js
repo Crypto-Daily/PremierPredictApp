@@ -236,12 +236,15 @@ function publishCapability(id, { endpoint, adapter, inputSchema, outputSchema, v
   });
 }
 
-function setCapabilityEnabled(id, enabled) {
+function setCapabilityEnabled(id, enabled, { authorized = false, authorizationNote = '' } = {}) {
   if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean.');
+  if (enabled && authorized !== true) throw new Error('Explicit authorization is required to enable a capability.');
   return mutateProject(id, p => {
     if (!p.publishedCapability) throw new Error('Capability must be published before it can be enabled.');
     p.publishedCapability.enabled = enabled;
     p.publishedCapability.status = enabled ? 'enabled' : 'disabled';
+    if (enabled) p.publishedCapability.enabledAt = new Date().toISOString();
+    p.publishedCapability.authorizationNote = String(authorizationNote).slice(0, 1000);
     p.state = enabled ? 'published' : 'disabled';
     p.revision += 1;
   });
