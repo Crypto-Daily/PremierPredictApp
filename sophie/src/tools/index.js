@@ -16,6 +16,7 @@ const plannerTool = require('./plannerTool');
 const executionTool = require('./executionTool');
 const multimodalWorkspaceTool = require('./multimodalWorkspaceTool');
 const modelRuntimeTool = require('./modelRuntimeTool');
+const capabilityFactoryTool = require('./capabilityFactoryTool');
 
 registerTool(hermesTool);
 registerTool(nexusTool);
@@ -32,5 +33,6 @@ registerTool(plannerTool);
 registerTool(executionTool);
 registerTool(multimodalWorkspaceTool);
 registerTool(modelRuntimeTool);
+registerTool(capabilityFactoryTool);
 
 module.exports = { registerTool, getTool, listTools, describeTool };
