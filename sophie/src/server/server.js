@@ -7,6 +7,7 @@ const cors = require('cors');
 const { checkRateLimit, authorize, audit } = require('./security');
 const { accessRoutes } = require('./access');
 const { modelRoutes } = require('./modelRegistry');
+const { factoryRoutes } = require('./capabilityFactoryRoutes');
 const diagnostics = require('./diagnostics');
 const path = require('path');
 const crypto = require('crypto');
@@ -157,6 +158,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Model registry API: protected by the authorization middleware above.
 modelRoutes(app);
+factoryRoutes(app);
 
 /*
  * --------------------------------------------------
