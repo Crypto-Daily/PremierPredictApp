@@ -59,7 +59,7 @@ try {
   assert.throws(() => factory.setCapabilityEnabled(project.id, true), /Explicit authorization/i);
   assert.equal(factory.setCapabilityEnabled(project.id, true, { authorized: true, authorizationNote: 'Test-only explicit approval.' }).publishedCapability.enabled, true);
   assert.equal(factory.setCapabilityEnabled(project.id, false).publishedCapability.enabled, false);
-  assert.equal(factory.getProjectById(project.id).state, 'published');
+  assert.equal(factory.getProjectById(project.id).state, 'disabled');
   assert.equal(factory.listProjects().length, 1);
   console.log('Sophie capability factory tests passed.');
 } finally {
