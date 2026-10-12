@@ -37,10 +37,10 @@ module.exports = {
         const project = factory.getProjectById(input.projectId);
         const query = String(input.query || (project.name + ' ' + project.goal)).slice(0, 4000);
         const results = await research(query, { limit: Math.max(1, Math.min(8, Number(input.limit) || 6)) });
-        const usable = results.filter(item => item && item.url && /^https?:\\/\\//i.test(item.url));
+        const usable = results.filter(item => item && item.url && /^https?:\/\//i.test(item.url));
         if (!usable.length) throw new Error('Research returned no usable source URLs; no research record was saved.');
         const saved = factory.saveResearch(input.projectId, {
-          summary: 'Research query: ' + query + '\\nCollected ' + usable.length + ' web results. Each result is untrusted external evidence and must be verified before implementation.',
+          summary: 'Research query: ' + query + '\nCollected ' + usable.length + ' web results. Each result is untrusted external evidence and must be verified before implementation.',
           sources: usable.map(item => item.url),
           findings: usable.map(item => '[' + (item.title || 'Untitled source') + '] ' + String(item.content || '').slice(0, 1800))
         });
