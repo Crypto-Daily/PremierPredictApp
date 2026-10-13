@@ -88,10 +88,16 @@ async function verifyFiles({ files, timeoutMs = 45_000 } = {}) {
       '--mount', 'type=bind,src=' + root + ',dst=/workspace,rw',
       '--workdir=/workspace', '--env=NODE_ENV=test',
       DEFAULT_IMAGE, 'sh', '-lc',
-      'set -eu; find . -type f -name "*.js" -print0 | xargs -0 -r -n1 node --check; if [ -f package.json ]; then node -e "const p=require(\'./package.json\'); if(p.scripts && p.scripts.test) process.exit(0); process.exit(2)" && npm test -- --runInBand; elif [ -f tests/run.js ]; then node tests/run.js; fi'
+      'set -eu; find . -type f -name "*.js" -print0 | xargs -0 -r -n1 node --check; if [ -f package.json ]; then node -e "const p=require(\'./package.json\'); if(p.scripts && p.scripts.test) process.exit(0); process.exit(2)" && npm test; elif [ -f tests/run.js ]; then node tests/run.js; fi'
     ];
     const result = await runDocker(args, { timeoutMs: timeout, cwd: root });
-    return { ...result, verified: true, stage: 'sandbox_tests', sandbox: 'docker-network-none-readonly-root', image: DEFAULT_IMAGE };
+    return {
+      ...result,
+      verified: result.ok === true && result.timedOut !== true && result.exitCode === 0,
+      stage: 'sandbox_tests',
+      sandbox: 'docker-network-none-readonly-root',
+      image: DEFAULT_IMAGE
+    };
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
