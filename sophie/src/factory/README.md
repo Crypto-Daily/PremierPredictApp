@@ -1,30 +1,43 @@
-# Sophie Capability Factory (staged foundation)
+# Sophie Capability Factory
 
-This feature branch adds a protected lifecycle for proposing and tracking new Sophie capabilities. It keeps capability records separate from the model registry.
+This feature implements the approved capability lifecycle for Sophie and Hermes: create a project, collect research, draft and revise a blueprint, require explicit approval, verify submitted source files in an isolated sandbox, register passing capabilities disabled by default, and expose registered capability discovery and invocation.
 
-## Current behavior
+## Workflow
 
-- Create/list capability projects; run a bounded web search through Sophie's existing research engine via the Hermes `capability_factory` tool; save source URLs, sanitized findings, and a structured blueprint. External results are untrusted evidence, not instructions.
-- Require explicit blueprint approval before the build lifecycle can start.
-- Record build/test results; publication requires an approved blueprint and a passing test record.
-- Published capabilities default to disabled. Enabling requires a separate explicit authorization flag.
-- Expose the lifecycle through protected /api/factory/... endpoints and a restricted Hermes tool.
-- Include lifecycle unit tests and syntax checks.
+1. Create a project with a name, goal, requirements, and constraints.
+2. Research the project and save sources/findings.
+3. Save and revise a structured blueprint. A blueprint revision clears prior approval and prior build/test/publication evidence.
+4. Approve the current blueprint through the authenticated API.
+5. Submit source files to the sandbox verification endpoint or Hermes `build_and_verify` tool. The source-file generation itself must be supplied by Hermes/the caller; this pipeline does not claim to autonomously write arbitrary source code.
+6. Verification runs syntax checks and the submitted package test script in a Docker container with network disabled, read-only container root, dropped Linux capabilities, no-new-privileges, CPU/memory/PID limits, and a timeout.
+7. Only a successful verified result may be published to the capability registry. Publication is disabled by default; enabling requires a separate explicit authorization.
+8. Sophie can discover registered capabilities. The HTTP JSON adapter invokes only enabled capabilities and limits remote endpoints to HTTPS (plain HTTP is allowed only on loopback).
 
-## Verification status
+## API
 
-GitHub Actions on this branch has now completed syntax checks and the full configured test command successfully after correcting a pre-existing auth regression assertion in `tests/nexus.test.js`. The assertion now explicitly sets `NODE_ENV=production` while checking that a wrong bearer token is denied, then restores the previous environment. This avoids depending on a developer environment with authentication disabled; it does not weaken runtime authentication.
+- `GET/POST /api/factory/projects`
+- `GET /api/factory/projects/:id`
+- `POST /api/factory/projects/:id/research`
+- `POST /api/factory/projects/:id/blueprint`
+- `POST /api/factory/projects/:id/approve`
+- `POST /api/factory/projects/:id/build/start`
+- `POST /api/factory/projects/:id/build/verify`
+- `POST /api/factory/projects/:id/build/result`
+- `POST /api/factory/projects/:id/tests/result`
+- `POST /api/factory/projects/:id/publish`
+- `POST /api/factory/projects/:id/enable`
+- `POST /api/factory/projects/:id/disable`
+- `GET /api/factory/capabilities`
+- `POST /api/factory/capabilities/:id/execute`
 
-## Important limitations — not production-ready yet
+All these routes are behind the server's existing API authorization middleware.
 
-This is a lifecycle and approval foundation, not the complete autonomous research/build factory.
+## Important boundaries
 
-- Research search is now connected to the existing research engine, but sources are not independently verified for accuracy, freshness, or authority. The HTTP API research endpoint still accepts supplied research records.
-- The `/api/factory/projects/:id/build/verify` endpoint now accepts bounded source-file payloads after explicit approval and runs syntax/test checks in a disposable Docker container with networking disabled, a read-only container root, dropped Linux capabilities, CPU/memory/PID limits, and a timeout. It requires the configured sandbox image to already exist locally; it never pulls images automatically. This verifies submitted files but does not itself ask Hermes to generate them.
-- Build/test result endpoints record supplied claims; they do not independently execute or verify tests.
-- The Docker verification runner is integrated, but an autonomous Hermes build-and-repair loop, per-project Git workspaces/branches, independently signed evidence, and automated artifact promotion are not implemented yet. The API accepts source files supplied by its caller, so do not treat this as proof Hermes generated them.
-- Publication stores disabled metadata in the factory registry; it does not add an executable adapter to the model registry or make the capability callable.
-- The persistent JSON store has no cross-process locking. Do not use it for concurrent production writes.
-- Endpoint/schema validation and a full security review are still required before any runtime adapter is enabled.
-
-The existing model registry and Meta AI bridge are unchanged. Do not deploy or enable generated capabilities based only on this lifecycle record. Complete the sandboxed runner and executable adapter integration, then run the full test suite and review the resulting diff before merging.
+- This is a capability factory, not a system that trains a new foundation model. Model endpoints can be registered as capabilities; training/fine-tuning needs separate infrastructure.
+- The factory tool can create/research/blueprint projects and submit caller-provided files for sandbox verification. It cannot approve a blueprint or enable a capability.
+- The source files tested are those supplied in the verification request. Passing tests do not prove a third party's claims or model quality.
+- The Docker sandbox image must already exist locally; it is not pulled automatically.
+- Runtime capability execution currently supports the `http-json` adapter and an `openai-compatible` label through the same JSON HTTP invocation interface. Other registered adapter labels are not executed by the current executor.
+- The JSON registry is suitable for the current single-process lifecycle foundation but does not implement cross-process locking.
+- This branch does not deploy, restart, or merge into production. Run checks and inspect the diff before activation.
