@@ -151,7 +151,14 @@ const started = startWorkflow({ command: 'analyze this dataset', intent: 'CHAT',
 assert.strictEqual(analyzeCsv(`name,score\na,10\nb,20`).numeric[0].header, 'score');
 assert.ok(verifyWorkflow({ response: 'analysis complete', requirements: ['analysis'] }).ok);
 
-assert.strictEqual(authorize({ headers: { authorization: 'Bearer wrong' } }).allowed, false);
+const previousNodeEnv = process.env.NODE_ENV;
+process.env.NODE_ENV = 'production';
+try {
+  assert.strictEqual(authorize({ headers: { authorization: 'Bearer wrong' } }).allowed, false);
+} finally {
+  if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = previousNodeEnv;
+}
 const limitedReq = { ip: 'phase12-test' };
 const rate = checkRateLimit(limitedReq);
 assert.strictEqual(rate.allowed, true);
