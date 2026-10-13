@@ -17,7 +17,7 @@ const DEFAULT_IMAGE = process.env.SOPHIE_FACTORY_SANDBOX_IMAGE || 'node:20-alpin
 
 function validateRelativePath(value) {
   if (typeof value !== 'string' || !value || value.length > 240) throw new Error('Each file requires a relative path (max 240 characters).');
-  if (value.includes('\\0') || value.includes('\\\\') || path.posix.isAbsolute(value)) throw new Error('Unsafe file path.');
+  if (value.includes('\0') || value.includes('\\') || path.posix.isAbsolute(value)) throw new Error('Unsafe file path.');
   const parts = value.split('/');
   if (parts.some(part => !part || part === '.' || part === '..')) throw new Error('Unsafe file path.');
   if (!/^[a-zA-Z0-9._/-]+$/.test(value)) throw new Error('File path contains unsupported characters.');
