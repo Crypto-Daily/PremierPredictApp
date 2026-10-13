@@ -5,10 +5,11 @@
 // enable capabilities. Those actions require a separate trusted control surface.
 const factory = require('../factory/capabilityFactory');
 const { research } = require('../nexus/researchEngine');
+const { buildAndVerify } = require('../factory/buildPipeline');
 
 const ACTIONS = new Set([
   'create_project', 'list_projects', 'get_project', 'research_project',
-  'save_research', 'save_blueprint', 'start_build',
+  'save_research', 'save_blueprint', 'start_build', 'build_and_verify',
   'record_build_result', 'record_test_result'
 ]);
 
@@ -59,6 +60,10 @@ module.exports = {
       case 'start_build':
         // This succeeds only after approval was recorded through a trusted API.
         return factory.startBuild(input.projectId);
+      case 'build_and_verify':
+        // Source files must be supplied by Hermes after owner approval; the runner
+        // executes checks only inside the isolated sandbox and never deploys them.
+        return buildAndVerify(input.projectId, input.files, { timeoutMs: input.timeoutMs });
       case 'record_build_result':
         return factory.recordBuildResult(input.projectId, {
           ok: input.ok, summary: input.summary, files: input.files
