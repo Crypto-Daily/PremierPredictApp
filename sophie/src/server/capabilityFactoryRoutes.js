@@ -1,6 +1,7 @@
 'use strict';
 
 const factory = require('../factory/capabilityFactory');
+const { buildAndVerify } = require('../factory/buildPipeline');
 
 function factoryRoutes(app) {
   app.get('/api/factory/projects', (req, res) => {
@@ -45,6 +46,15 @@ function factoryRoutes(app) {
         notice: 'Lifecycle state only. No code was executed. A sandboxed build runner is not yet integrated.'
       });
     } catch (error) { res.status(400).json({ error: String(error.message || error).slice(0, 500) }); }
+  });
+
+  app.post('/api/factory/projects/:id/build/verify', async (req, res) => {
+    try {
+      const result = await buildAndVerify(req.params.id, req.body?.files, { timeoutMs: req.body?.timeoutMs });
+      res.status(result.verification.ok && result.verification.verified ? 200 : 422).json({ ok: result.verification.ok === true && result.verification.verified === true, ...result });
+    } catch (error) {
+      res.status(400).json({ error: String(error.message || error).slice(0, 500) });
+    }
   });
 
   app.post('/api/factory/projects/:id/build/result', (req, res) => {
