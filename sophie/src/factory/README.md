@@ -11,6 +11,10 @@ This feature branch adds a protected lifecycle for proposing and tracking new So
 - Expose the lifecycle through protected /api/factory/... endpoints and a restricted Hermes tool.
 - Include lifecycle unit tests and syntax checks.
 
+## Verification status
+
+GitHub Actions on this branch has now completed syntax checks and the full configured test command successfully after correcting a pre-existing auth regression assertion in `tests/nexus.test.js`. The assertion now explicitly sets `NODE_ENV=production` while checking that a wrong bearer token is denied, then restores the previous environment. This avoids depending on a developer environment with authentication disabled; it does not weaken runtime authentication.
+
 ## Important limitations — not production-ready yet
 
 This is a lifecycle and approval foundation, not the complete autonomous research/build factory.
