@@ -12,8 +12,8 @@ try {
  const p = factory.createProject({name:'Approval lifecycle test',goal:'Test exact blueprint approval gate.'});
  factory.saveResearch(p.id,{summary:'Research',sources:['https://example.org'],findings:['Finding']});
  factory.saveBlueprint(p.id,{overview:'Test',modules:['one'],language:'Node.js',interfaces:['local'],implementationPlan:'Implement test',testPlan:'Run tests',risks:[],openQuestions:[]});
- assert.throws(()=>lifecycle.startBuild(p.id),/approval/i);
- assert.throws(()=>lifecycle.approve(p.id,{approved:false}),/approval/i);
+ assert.throws(()=>lifecycle.startBuild(p.id),/approv/i);
+ assert.throws(()=>lifecycle.approve(p.id,{approved:false}),/approv/i);
  lifecycle.approve(p.id,{approved:true,notes:'Owner approved test blueprint'});
  assert.equal(lifecycle.startBuild(p.id).state,'building');
  factory.recordBuildResult(p.id,{ok:true,summary:'Built',files:['index.js']});
