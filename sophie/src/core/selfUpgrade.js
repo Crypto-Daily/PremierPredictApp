@@ -356,6 +356,26 @@ async function applyUpgrade({
       };
     }
 
+    // Syntax validation alone is insufficient for a supervised upgrade.
+    // Run the repository's own test suite before any restart or checkpoint.
+    let testSuite;
+    try {
+      testSuite = {
+        ok: true,
+        output: run('npm', ['test'], { timeout: 120000 }).slice(-12000)
+      };
+    } catch (error) {
+      const rollback = await rollbackAndRestart(writeResult.backup);
+      return {
+        ok: false,
+        stage: 'test-suite',
+        error: `${error.stdout || ''}${error.stderr || ''}`.trim() || error.message,
+        changed: writeResult.changed,
+        backupDir: writeResult.backupDir,
+        rollback
+      };
+    }
+
     let restartResult = null;
     let health = null;
     let rollback = null;
@@ -406,6 +426,7 @@ async function applyUpgrade({
       changed: writeResult.changed,
       backupDir: writeResult.backupDir,
       syntax: writeResult.syntax,
+      tests: testSuite,
       checkpoint: checkpointResult,
       restart: restartResult,
       health,
