@@ -1050,6 +1050,16 @@
       <button class="choice-btn" id="upgradeModeBtn">Enable Upgrade Mode</button>
     </div>
 
+    <div class="settings-group" id="supervisedUpgradeGroup">
+      <div class="settings-label">Supervised self-improvement</div>
+      <div class="settings-label">Describe the change you want Sophie to propose. Nothing is applied until you review the files and approve.</div>
+      <textarea id="upgradeRequest" rows="4" placeholder="Example: Improve image-generation error handling without changing existing provider contracts." style="width:100%;resize:vertical;background:var(--navy-deep);color:var(--milk);border:1px solid var(--navy-line);border-radius:10px;padding:10px;font:inherit;"></textarea>
+      <button class="choice-btn" id="proposeUpgradeBtn">Prepare upgrade proposal</button>
+      <div id="upgradeProposalStatus" class="settings-label" role="status" aria-live="polite"></div>
+      <div id="upgradeProposalPreview"></div>
+      <button class="choice-btn" id="approveUpgradeBtn" hidden>Approve and apply this upgrade</button>
+    </div>
+
     <button id="closeSettings">Close</button>
   </div>
 </div>
@@ -1401,6 +1411,110 @@ refreshUpgradeMode();
 });
 
 refreshUpgradeMode();
+
+const upgradeRequest = document.getElementById('upgradeRequest');
+const proposeUpgradeBtn = document.getElementById('proposeUpgradeBtn');
+const upgradeProposalStatus = document.getElementById('upgradeProposalStatus');
+const upgradeProposalPreview = document.getElementById('upgradeProposalPreview');
+const approveUpgradeBtn = document.getElementById('approveUpgradeBtn');
+let pendingUpgradePlanId = null;
+
+function clearUpgradeProposal() {
+  pendingUpgradePlanId = null;
+  upgradeProposalPreview.replaceChildren();
+  approveUpgradeBtn.hidden = true;
+}
+
+proposeUpgradeBtn.addEventListener('click', async () => {
+  const command = upgradeRequest.value.trim();
+  if (!command) {
+    upgradeProposalStatus.textContent = 'Describe the improvement first.';
+    return;
+  }
+  clearUpgradeProposal();
+  proposeUpgradeBtn.disabled = true;
+  upgradeProposalStatus.textContent = 'Sophie is inspecting the relevant source and preparing a proposal…';
+  try {
+    const response = await fetch('/api/self-upgrade/propose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ command })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not prepare proposal.');
+    pendingUpgradePlanId = data.planId;
+
+    const summary = document.createElement('p');
+    summary.textContent = 'Proposal: ' + (data.summary || 'No summary provided.');
+    upgradeProposalPreview.appendChild(summary);
+
+    const inspected = document.createElement('p');
+    inspected.textContent = 'Files inspected: ' + (Array.isArray(data.inspected) ? data.inspected.join(', ') : 'not reported');
+    upgradeProposalPreview.appendChild(inspected);
+
+    const warning = document.createElement('p');
+    warning.textContent = 'Review every proposed file below before approving. Approval writes these exact contents, runs the test suite, creates a Git checkpoint, then schedules a restart.';
+    upgradeProposalPreview.appendChild(warning);
+
+    for (const change of (Array.isArray(data.changes) ? data.changes : [])) {
+      const details = document.createElement('details');
+      details.style.cssText = 'margin:8px 0;border:1px solid var(--navy-line);border-radius:8px;padding:8px;';
+      const heading = document.createElement('summary');
+      heading.textContent = change.path;
+      heading.style.cursor = 'pointer';
+      const preview = document.createElement('pre');
+      preview.textContent = String(change.content || '');
+      preview.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;font-size:11px;color:var(--milk-muted);';
+      details.append(heading, preview);
+      upgradeProposalPreview.appendChild(details);
+    }
+
+    approveUpgradeBtn.hidden = false;
+    upgradeProposalStatus.textContent = 'Proposal ready. No files have been changed yet.';
+  } catch (error) {
+    upgradeProposalStatus.textContent = error.message;
+  } finally {
+    proposeUpgradeBtn.disabled = false;
+  }
+});
+
+approveUpgradeBtn.addEventListener('click', async () => {
+  if (!pendingUpgradePlanId) return;
+  const confirmed = await showModal({
+    title: 'Approve Sophie upgrade?',
+    message: 'This writes the exact reviewed files, runs npm test, creates a Git checkpoint, and schedules a Sophie restart. Continue only if you reviewed the proposal.',
+    isConfirm: true,
+    confirmLabel: 'Approve upgrade'
+  });
+  if (!confirmed || !pendingUpgradePlanId) return;
+
+  const planId = pendingUpgradePlanId;
+  approveUpgradeBtn.disabled = true;
+  proposeUpgradeBtn.disabled = true;
+  upgradeProposalStatus.textContent = 'Applying approved changes and running tests…';
+  try {
+    const response = await fetch('/api/self-upgrade/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ planId, approve: true })
+    });
+    const data = await response.json();
+    if (!response.ok || data.ok !== true) {
+      throw new Error(data.error || ('Upgrade failed at stage: ' + (data.stage || 'unknown')));
+    }
+    clearUpgradeProposal();
+    upgradeProposalStatus.textContent = 'Upgrade passed validation and tests. Git checkpoint: ' +
+      (data.checkpoint && data.checkpoint.commit ? data.checkpoint.commit : 'not confirmed') +
+      '. Sophie is restarting; reconnect in a few seconds.';
+  } catch (error) {
+    upgradeProposalStatus.textContent = 'Upgrade was not confirmed: ' + error.message;
+  } finally {
+    approveUpgradeBtn.disabled = false;
+    proposeUpgradeBtn.disabled = false;
+  }
+});
 
 function openSidebar() { sidebar.classList.add('open'); overlay.classList.add('open'); }
 function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
