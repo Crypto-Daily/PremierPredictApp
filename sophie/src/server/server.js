@@ -27,12 +27,16 @@ const app = express();
 app.set('trust proxy', 1);
 
 const upgradeSessions = new Map();
+const pendingUpgradePlans = new Map();
 const UPGRADE_SESSION_TTL = 30 * 60 * 1000;
 
 function cleanupUpgradeSessions() {
   const now = Date.now();
   for (const [token, expiresAt] of upgradeSessions) {
     if (expiresAt <= now) upgradeSessions.delete(token);
+  }
+  for (const [planId, plan] of pendingUpgradePlans) {
+    if (plan.expiresAt <= now) pendingUpgradePlans.delete(planId);
   }
 }
 
@@ -766,6 +770,82 @@ app.post('/api/self-upgrade/chat', async (req, res) => {
   } catch (error) {
     console.error('[SELF-UPGRADE CHAT] ERROR:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Supervised workflow: proposals are staged server-side and never applied until
+// the authenticated administrator explicitly approves the exact plan.
+app.post('/api/self-upgrade/propose', async (req, res) => {
+  try {
+    if (!hasUpgradeSession(req)) {
+      return res.status(401).json({ error: 'Unlock Upgrade Mode before proposing changes.' });
+    }
+
+    const { command } = req.body || {};
+    if (typeof command !== 'string' || !command.trim()) {
+      return res.status(400).json({ error: 'A clear upgrade request is required.' });
+    }
+
+    const plan = await planUpgrade(command.trim());
+    const planId = randomUUID();
+    const expiresAt = Date.now() + UPGRADE_SESSION_TTL;
+
+    pendingUpgradePlans.set(planId, {
+      plan,
+      expiresAt,
+      createdAt: Date.now()
+    });
+
+    res.json({
+      ok: true,
+      planId,
+      expiresAt,
+      summary: plan.summary,
+      inspected: plan.inspected,
+      inspectionReason: plan.inspectionReason,
+      changes: plan.changes.map(change => ({ path: change.path, content: change.content }))
+    });
+  } catch (error) {
+    console.error('[SELF-UPGRADE PROPOSE] ERROR:', error);
+    res.status(422).json({ error: error.message || 'Could not prepare an upgrade proposal.' });
+  }
+});
+
+app.post('/api/self-upgrade/approve', async (req, res) => {
+  try {
+    if (!hasUpgradeSession(req)) {
+      return res.status(401).json({ error: 'Upgrade Mode expired or is locked. Unlock it again before approving.' });
+    }
+
+    const { planId, approve } = req.body || {};
+    if (approve !== true || typeof planId !== 'string' || !planId) {
+      return res.status(400).json({ error: 'Explicit approval and a valid planId are required.' });
+    }
+
+    cleanupUpgradeSessions();
+    const staged = pendingUpgradePlans.get(planId);
+    if (!staged || staged.expiresAt <= Date.now()) {
+      pendingUpgradePlans.delete(planId);
+      return res.status(404).json({ error: 'This proposal has expired or was already used. Generate a new proposal.' });
+    }
+
+    // Consume before applying so a second request cannot replay the same approval.
+    pendingUpgradePlans.delete(planId);
+    const result = await applyUpgrade({
+      changes: staged.plan.changes,
+      checkpoint: true,
+      restart: true,
+      checkpointMessage: 'Sophie supervised self-upgrade'
+    });
+
+    res.status(result.ok ? 200 : 422).json({
+      ...result,
+      summary: staged.plan.summary,
+      inspected: staged.plan.inspected
+    });
+  } catch (error) {
+    console.error('[SELF-UPGRADE APPROVE] ERROR:', error);
+    if (!res.headersSent) res.status(500).json({ error: error.message || 'Could not apply the approved upgrade.' });
   }
 });
 
