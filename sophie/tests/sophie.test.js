@@ -46,10 +46,12 @@ const fs = require('fs');
 const path = require('path');
 const htmlPath = path.join(__dirname, '../src/server/public/index.html');
 const html = fs.readFileSync(htmlPath, 'utf8');
-const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)];
-assert(scripts.length > 0, 'Sophie UI should contain its application script');
+const scriptStart = html.lastIndexOf('<script>');
+const scriptEnd = html.lastIndexOf('</script>');
+assert(scriptStart >= 0 && scriptEnd > scriptStart, 'Sophie UI should contain its application script');
+const scriptSource = html.slice(scriptStart + '<script>'.length, scriptEnd);
 assert.doesNotThrow(
-  () => new Function(scripts[scripts.length - 1][1]),
+  () => new Function(scriptSource),
   'Sophie UI inline JavaScript must parse successfully'
 );
 
