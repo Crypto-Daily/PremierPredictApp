@@ -13,7 +13,7 @@ const Memory = require('../memory/memory');
 const CommandProcessor = require('../commands/commandProcessor');
 const { analyzeImage } = require('../ai/vision');
 const { writeProjectFile } = require('../core/selfWrite');
-const { planUpgrade, planAndApplyUpgrade } = require('../core/selfUpgradePlanner');
+const { planUpgrade } = require('../core/selfUpgradePlanner');
 const { ModeManager } = require('../core/modeManager');
 const { listArtifacts, resolveArtifact, WORKSPACE_ROOT } = require('../core/artifactManager');
 const {
@@ -27,12 +27,16 @@ const app = express();
 app.set('trust proxy', 1);
 
 const upgradeSessions = new Map();
+const pendingUpgradePlans = new Map();
 const UPGRADE_SESSION_TTL = 30 * 60 * 1000;
 
 function cleanupUpgradeSessions() {
   const now = Date.now();
   for (const [token, expiresAt] of upgradeSessions) {
     if (expiresAt <= now) upgradeSessions.delete(token);
+  }
+  for (const [planId, plan] of pendingUpgradePlans) {
+    if (plan.expiresAt <= now) pendingUpgradePlans.delete(planId);
   }
 }
 
@@ -754,75 +758,106 @@ app.post('/api/self-upgrade/plan', async (req, res) => {
   }
 });
 
-app.post('/api/self-upgrade/chat', async (req, res) => {
+app.post('/api/self-upgrade/chat', (req, res) => {
+  res.status(409).json({
+    error: 'Direct self-upgrade is disabled in supervised mode. Use Settings → Supervised self-improvement to review a proposal and explicitly approve it.'
+  });
+});
+
+// Supervised workflow: proposals are staged server-side and never applied until
+// the authenticated administrator explicitly approves the exact plan.
+app.post('/api/self-upgrade/propose', async (req, res) => {
   try {
-    const { passcode, command, checkpoint = true, restart = false, checkpointMessage } = req.body;
-    if (!passcode || !command) return res.status(400).json({ error: 'passcode and command are required' });
-    if (!process.env.SOPHIE_ADMIN_PASSCODE || passcode !== process.env.SOPHIE_ADMIN_PASSCODE) {
-      return res.status(401).json({ error: 'Incorrect passcode' });
+    if (!hasUpgradeSession(req)) {
+      return res.status(401).json({ error: 'Unlock Upgrade Mode before proposing changes.' });
     }
-    const result = await planAndApplyUpgrade({ command, checkpoint, restart, checkpointMessage });
-    res.status(result.ok ? 200 : 422).json(result);
+
+    const { command } = req.body || {};
+    if (typeof command !== 'string' || !command.trim()) {
+      return res.status(400).json({ error: 'A clear upgrade request is required.' });
+    }
+
+    const plan = await planUpgrade(command.trim());
+    const planId = randomUUID();
+    const expiresAt = Date.now() + UPGRADE_SESSION_TTL;
+
+    pendingUpgradePlans.set(planId, {
+      plan,
+      expiresAt,
+      createdAt: Date.now()
+    });
+
+    res.json({
+      ok: true,
+      planId,
+      expiresAt,
+      summary: plan.summary,
+      inspected: plan.inspected,
+      inspectionReason: plan.inspectionReason,
+      changes: plan.changes.map(change => ({ path: change.path, content: change.content }))
+    });
   } catch (error) {
-    console.error('[SELF-UPGRADE CHAT] ERROR:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[SELF-UPGRADE PROPOSE] ERROR:', error);
+    res.status(422).json({ error: error.message || 'Could not prepare an upgrade proposal.' });
   }
 });
 
-app.post('/api/self-upgrade', async (req, res) => {
+app.post('/api/self-upgrade/approve', async (req, res) => {
   try {
-    const {
-      passcode,
-      changes,
-      checkpoint = true,
-      restart = false,
-      checkpointMessage
-    } = req.body;
-
-    if (!passcode) {
-      return res.status(401).json({
-        error: 'Admin passcode is required'
-      });
+    if (!hasUpgradeSession(req)) {
+      return res.status(401).json({ error: 'Upgrade Mode expired or is locked. Unlock it again before approving.' });
     }
 
-    if (!Array.isArray(changes) || changes.length === 0) {
-      return res.status(400).json({
-        error: 'changes must be a non-empty array'
-      });
+    const { planId, approve } = req.body || {};
+    if (approve !== true || typeof planId !== 'string' || !planId) {
+      return res.status(400).json({ error: 'Explicit approval and a valid planId are required.' });
     }
 
-    if (changes.length > 20) {
-      return res.status(400).json({
-        error: 'A single upgrade may modify at most 20 files'
-      });
+    cleanupUpgradeSessions();
+    const staged = pendingUpgradePlans.get(planId);
+    if (!staged || staged.expiresAt <= Date.now()) {
+      pendingUpgradePlans.delete(planId);
+      return res.status(404).json({ error: 'This proposal has expired or was already used. Generate a new proposal.' });
     }
 
-    const realPasscode = process.env.SOPHIE_ADMIN_PASSCODE;
-
-    if (!realPasscode || passcode !== realPasscode) {
-      return res.status(401).json({
-        error: 'Incorrect passcode'
-      });
-    }
-
+    // Consume before applying so a second request cannot replay the same approval.
+    pendingUpgradePlans.delete(planId);
     const result = await applyUpgrade({
-      changes,
-      checkpoint,
-      restart,
-      checkpointMessage
+      changes: staged.plan.changes,
+      checkpoint: true,
+      restart: true,
+      checkpointMessage: 'Sophie supervised self-upgrade',
+      restart: false
     });
 
-    res.status(result.ok ? 200 : 422).json(result);
+    res.status(result.ok ? 200 : 422).json({
+      ...result,
+      restartScheduled: result.ok,
+      summary: staged.plan.summary,
+      inspected: staged.plan.inspected
+    });
 
-  } catch (error) {
-    console.error('[SELF-UPGRADE] ERROR:', error);
-
-    if (!res.headersSent) {
-      res.status(500).json({
-        error: error.message
-      });
+    // Send the approval result before restarting the process that owns this socket.
+    if (result.ok) {
+      setTimeout(() => {
+        try {
+          const { restartSophie } = require('../core/selfUpgrade');
+          console.log('[SELF-UPGRADE] Approved upgrade restart:', restartSophie());
+        } catch (error) {
+          console.error('[SELF-UPGRADE] Approved upgrade restart failed:', error);
+        }
+      }, 1500);
     }
+  } catch (error) {
+    console.error('[SELF-UPGRADE APPROVE] ERROR:', error);
+    if (!res.headersSent) res.status(500).json({ error: error.message || 'Could not apply the approved upgrade.' });
   }
+});
+
+app.post('/api/self-upgrade', (req, res) => {
+  res.status(409).json({
+    error: 'Direct file application is disabled in supervised mode. Submit a proposal, inspect the exact file contents, and approve it through /api/self-upgrade/approve.'
+  });
 });
 
 /*
