@@ -23,6 +23,36 @@ assert.strictEqual(
   'selfUpgrade.validateProject must exist'
 );
 
+assert.strictEqual(
+  selfUpgrade.normalizeProjectPath('src/core/selfUpgrade.js').relative,
+  'src/core/selfUpgrade.js',
+  'self-upgrade should accept an in-scope source file'
+);
+
+assert.throws(
+  () => selfUpgrade.normalizeProjectPath('../.env'),
+  /restricted to src/,
+  'self-upgrade must reject paths outside src/'
+);
+
+assert.throws(
+  () => selfUpgrade.normalizeProjectPath('package.json'),
+  /restricted to src/,
+  'self-upgrade must not modify project configuration files'
+);
+
+// Parse the inline browser application script without executing browser code.
+const fs = require('fs');
+const path = require('path');
+const htmlPath = path.join(__dirname, '../src/server/public/index.html');
+const html = fs.readFileSync(htmlPath, 'utf8');
+const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)];
+assert(scripts.length > 0, 'Sophie UI should contain its application script');
+assert.doesNotThrow(
+  () => new Function(scripts[scripts.length - 1][1]),
+  'Sophie UI inline JavaScript must parse successfully'
+);
+
 const validation = selfUpgrade.validateProject();
 
 if (!validation.ok) {
