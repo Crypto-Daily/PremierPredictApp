@@ -835,14 +835,28 @@ app.post('/api/self-upgrade/approve', async (req, res) => {
       changes: staged.plan.changes,
       checkpoint: true,
       restart: true,
-      checkpointMessage: 'Sophie supervised self-upgrade'
+      checkpointMessage: 'Sophie supervised self-upgrade',
+      restart: false
     });
 
     res.status(result.ok ? 200 : 422).json({
       ...result,
+      restartScheduled: result.ok,
       summary: staged.plan.summary,
       inspected: staged.plan.inspected
     });
+
+    // Send the approval result before restarting the process that owns this socket.
+    if (result.ok) {
+      setTimeout(() => {
+        try {
+          const { restartSophie } = require('../core/selfUpgrade');
+          console.log('[SELF-UPGRADE] Approved upgrade restart:', restartSophie());
+        } catch (error) {
+          console.error('[SELF-UPGRADE] Approved upgrade restart failed:', error);
+        }
+      }, 1500);
+    }
   } catch (error) {
     console.error('[SELF-UPGRADE APPROVE] ERROR:', error);
     if (!res.headersSent) res.status(500).json({ error: error.message || 'Could not apply the approved upgrade.' });
