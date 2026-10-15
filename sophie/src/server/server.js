@@ -13,7 +13,7 @@ const Memory = require('../memory/memory');
 const CommandProcessor = require('../commands/commandProcessor');
 const { analyzeImage } = require('../ai/vision');
 const { writeProjectFile } = require('../core/selfWrite');
-const { planUpgrade, planAndApplyUpgrade } = require('../core/selfUpgradePlanner');
+const { planUpgrade } = require('../core/selfUpgradePlanner');
 const { ModeManager } = require('../core/modeManager');
 const { listArtifacts, resolveArtifact, WORKSPACE_ROOT } = require('../core/artifactManager');
 const {
@@ -758,19 +758,10 @@ app.post('/api/self-upgrade/plan', async (req, res) => {
   }
 });
 
-app.post('/api/self-upgrade/chat', async (req, res) => {
-  try {
-    const { passcode, command, checkpoint = true, restart = false, checkpointMessage } = req.body;
-    if (!passcode || !command) return res.status(400).json({ error: 'passcode and command are required' });
-    if (!process.env.SOPHIE_ADMIN_PASSCODE || passcode !== process.env.SOPHIE_ADMIN_PASSCODE) {
-      return res.status(401).json({ error: 'Incorrect passcode' });
-    }
-    const result = await planAndApplyUpgrade({ command, checkpoint, restart, checkpointMessage });
-    res.status(result.ok ? 200 : 422).json(result);
-  } catch (error) {
-    console.error('[SELF-UPGRADE CHAT] ERROR:', error);
-    res.status(500).json({ error: error.message });
-  }
+app.post('/api/self-upgrade/chat', (req, res) => {
+  res.status(409).json({
+    error: 'Direct self-upgrade is disabled in supervised mode. Use Settings → Supervised self-improvement to review a proposal and explicitly approve it.'
+  });
 });
 
 // Supervised workflow: proposals are staged server-side and never applied until
@@ -863,60 +854,10 @@ app.post('/api/self-upgrade/approve', async (req, res) => {
   }
 });
 
-app.post('/api/self-upgrade', async (req, res) => {
-  try {
-    const {
-      passcode,
-      changes,
-      checkpoint = true,
-      restart = false,
-      checkpointMessage
-    } = req.body;
-
-    if (!passcode) {
-      return res.status(401).json({
-        error: 'Admin passcode is required'
-      });
-    }
-
-    if (!Array.isArray(changes) || changes.length === 0) {
-      return res.status(400).json({
-        error: 'changes must be a non-empty array'
-      });
-    }
-
-    if (changes.length > 20) {
-      return res.status(400).json({
-        error: 'A single upgrade may modify at most 20 files'
-      });
-    }
-
-    const realPasscode = process.env.SOPHIE_ADMIN_PASSCODE;
-
-    if (!realPasscode || passcode !== realPasscode) {
-      return res.status(401).json({
-        error: 'Incorrect passcode'
-      });
-    }
-
-    const result = await applyUpgrade({
-      changes,
-      checkpoint,
-      restart,
-      checkpointMessage
-    });
-
-    res.status(result.ok ? 200 : 422).json(result);
-
-  } catch (error) {
-    console.error('[SELF-UPGRADE] ERROR:', error);
-
-    if (!res.headersSent) {
-      res.status(500).json({
-        error: error.message
-      });
-    }
-  }
+app.post('/api/self-upgrade', (req, res) => {
+  res.status(409).json({
+    error: 'Direct file application is disabled in supervised mode. Submit a proposal, inspect the exact file contents, and approve it through /api/self-upgrade/approve.'
+  });
 });
 
 /*
