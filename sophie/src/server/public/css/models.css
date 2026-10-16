@@ -1,1 +1,7 @@
 .model-nav-link{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:4px 0;border:1px solid #293a50;border-radius:9px;color:#c9dcf7;text-decoration:none;font-size:13px;background:rgba(20,34,55,.45)}.model-nav-link:hover{background:#17263b;border-color:#58749a;color:#fff}
+/* Model Studio scroll behavior on desktop and mobile */
+html:has(.model-page),body:has(.model-page){height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.model-page{width:100%;min-height:100vh;overflow:visible}
+.model-page .model-grid{order:2}
+.model-page .hero{order:3}
+@supports(height:100dvh){.model-page{min-height:100dvh}}
