@@ -4,6 +4,7 @@ const { askWithFallback, askAllRanked } = require('../ai/providerRouter');
 const { routeIntent } = require('../ai/intentRouter');
 const { buildSophiePrompt } = require('../ai/prompt');
 const { getCurrentTimeContext } = require('../core/time');
+const capabilityFactory = require('../factory/capabilityFactory');
 const { performWebResearch } = require('../research/webSearch');
 const { fetchAndSummarizeUrl } = require('../research/urlFetch');
 const { planAndApplyUpgrade } = require('../core/selfUpgradePlanner');
@@ -222,6 +223,56 @@ class CommandProcessor {
       return { type: 'response', text };
     }
 
+    // Capability Factory chat integration. Creation only opens a draft; it never
+    // approves, builds, publishes, enables, or deploys a capability automatically.
+    if (/^(?:list|show) (?:my )?(?:factory )?(?:capabilities|capability projects|model projects|created models)\\??$/i.test(command)) {
+      try {
+        const projects = capabilityFactory.listProjects();
+        const text = projects.length
+          ? 'Your capability projects:\\n\\n' + projects.map(p => '- ' + p.name + ' [' + p.state + '] — ' + p.id).join('\\n') +
+            '\\n\\nOpen Model Studio to review each blueprint and continue through the approval-gated build pipeline.'
+          : 'You have no capability projects yet. Ask me: “Create a capability called <name> that <goal>.”';
+        this.memory.addMessage('assistant', text);
+        return { type: 'response', text, factoryProjects: projects };
+      } catch (error) {
+        const text = 'I could not read the Capability Factory registry: ' + error.message;
+        this.memory.addMessage('assistant', text);
+        return { type: 'response', text };
+      }
+    }
+
+    const createCapabilityMatch = command.match(/^(?:please )?(?:create|make|build|develop|design|start) (?:me )?(?:a |an )?(?:new )?(?:ai )?(?:model|capability|tool|integration)(?: called| named)?\\s+(.+)$/i);
+    if (createCapabilityMatch) {
+      const requested = createCapabilityMatch[1].trim().replace(/[.!?]+$/, '');
+      const split = requested.match(/^(.{1,120}?)\\s+(?:that|which|to)\\s+(.+)$/i);
+      const name = (split ? split[1] : requested).trim();
+      const goal = split ? split[2].trim() : command;
+      try {
+        const project = capabilityFactory.createProject({
+          name,
+          goal: goal.length >= 4 ? goal : command,
+          requirements: [],
+          constraints: [
+            'Do not modify Sophie or Hermes core code as part of this capability.',
+            'Do not access secrets or credentials.',
+            'Require explicit user approval before build, publish, enable, or deployment.',
+            'Register the capability disabled until separately authorized.'
+          ],
+          createdBy: 'sophie-chat'
+        });
+        const text = 'I created a draft capability project: "' + project.name + '" (ID: ' + project.id + ').\\n\\n' +
+          'Goal: ' + project.goal + '\\n\\n' +
+          'Current stage: Draft. Nothing has been built, enabled, or deployed.\\n\\n' +
+          'Next: open Model Studio → Created by You, review the project, then ask me to research and prepare its blueprint. I will stop for your explicit approval before any build.';
+        this.memory.addMessage('assistant', text);
+        return { type: 'response', text, factoryProject: project };
+      } catch (error) {
+        const text = 'I could not create that capability project: ' + error.message;
+        this.memory.addMessage('assistant', text);
+        return { type: 'response', text };
+      }
+    }
+
     const intent = routeIntent(command);
 
     console.log(`[INTENT] ${intent}`);
@@ -373,16 +424,21 @@ class CommandProcessor {
         throw error;
       }
 
-      const text =
-        'I could not complete that action through my execution engine. ' +
-        'Nothing is being claimed as completed unless the tool actually succeeded.';
+      // A failed Hermes session must not terminate an ordinary conversation.
+      // Continue through Sophie's configured conversational provider path below.
+      // For execution requests, preserve the failure rather than pretending a
+      // file or external action succeeded.
+      const conversationalIntent = ['CHAT', 'MEMORY', 'VISION'].includes(intent);
+      if (!conversationalIntent) {
+        const detail = error?.code === 'NEXUS_VERIFICATION_FAILED'
+          ? 'Hermes could not verify that the requested action completed.'
+          : 'Hermes execution is currently unavailable.';
+        const text = detail + ' No file or external action is being claimed as completed. You can retry the task after the execution engine is available.';
+        this.memory.addMessage('assistant', text);
+        return { type: 'response', text, executionError: true };
+      }
 
-      this.memory.addMessage('assistant', text);
-
-      return {
-        type: 'response',
-        text
-      };
+      console.warn('[AGENT] Falling back to conversational provider after Hermes failure.');
     }
 
     try {

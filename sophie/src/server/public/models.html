@@ -3,41 +3,47 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#06080c"><title>Model Studio — Sophie</title>
-<link rel="stylesheet" href="/css/app.css">
-<link rel="stylesheet" href="/css/models.css">
+<link rel="stylesheet" href="/css/app.css"><link rel="stylesheet" href="/css/models.css">
 <style>
-.model-page{max-width:1180px;margin:0 auto;padding:28px 20px 60px}.model-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}.model-top h1{margin:0;font-size:28px}.model-top p{color:#9caec5;margin:8px 0 0}.model-layout{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:18px}.model-card{border:1px solid var(--line,#273448);background:var(--panel,#0c121c);border-radius:16px;padding:18px;min-width:0}.model-card h2{font-size:16px;margin:0 0 16px}.model-form{display:grid;gap:12px}.model-form label{display:grid;gap:6px;color:#aebbd0;font-size:12px}.model-form input,.model-form select,.model-form textarea{width:100%;box-sizing:border-box;padding:10px 11px;border:1px solid #2c3b50;border-radius:9px;background:#070b12;color:#eef4ff;font:inherit}.model-form textarea{min-height:72px;resize:vertical}.model-actions{display:flex;gap:8px;flex-wrap:wrap}.model-actions button,.model-button{border:1px solid #344760;background:#142237;color:#e8f1ff;padding:9px 12px;border-radius:9px;cursor:pointer}.model-actions .primary{background:#b9d4ff;color:#07101c;border-color:#b9d4ff;font-weight:700}.model-list{display:grid;gap:10px}.model-item{border:1px solid #25354a;border-radius:12px;padding:14px;display:grid;gap:9px}.model-item-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.model-item h3{margin:0;font-size:15px}.model-meta{font-size:12px;color:#a8b7cc;overflow-wrap:anywhere}.model-tags{display:flex;gap:6px;flex-wrap:wrap}.model-tag{font-size:11px;padding:4px 7px;border:1px solid #30425a;border-radius:999px;color:#c6d5e9}.model-status{font-size:11px;color:#9ddbb4}.model-status.off{color:#f1c28a}.model-empty,.model-note{font-size:12px;color:#9caec5;line-height:1.6}.model-message{min-height:18px;font-size:13px;color:#9ddbb4}.model-message.error{color:#ffaaa6}.model-login{max-width:360px;margin:12vh auto;padding:24px;border:1px solid #2c3b50;border-radius:16px;background:#0c121c}.model-login input{box-sizing:border-box;width:100%;padding:12px;margin:10px 0;background:#070b12;color:#fff;border:1px solid #2c3b50;border-radius:8px}.model-login button{padding:10px 14px;border-radius:8px}.model-login .loginerr{color:#ffaaa6;font-size:13px;margin-top:10px}@media(max-width:800px){.model-layout{grid-template-columns:1fr}.model-page{padding:20px 12px 40px}}
+.model-page{display:flex;flex-direction:column;max-width:1240px;margin:0 auto;padding:28px 20px 60px}.model-top{order:1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}.model-top h1{margin:0;font-size:28px}.model-top p,.muted{color:#9caec5}.model-top p{margin:8px 0 0}.model-actions,.row-actions,.chips{display:flex;gap:8px;flex-wrap:wrap}.model-button,.action{display:inline-flex;align-items:center;justify-content:center;border:1px solid #344760;background:#142237;color:#e8f1ff;padding:9px 12px;border-radius:9px;cursor:pointer;text-decoration:none;font:inherit;font-size:13px}.action.primary{background:#b9d4ff;color:#07101c;border-color:#b9d4ff;font-weight:700}.action:disabled{opacity:.5;cursor:not-allowed}.hero{order:3;border:1px solid #2b405b;background:linear-gradient(120deg,#111e30,#0b111b 70%);border-radius:18px;padding:22px;margin-bottom:20px}.eyebrow{font-size:11px;letter-spacing:.15em;color:#8bbaff;font-weight:700}.hero h2{margin:8px 0;font-size:21px}.hero p{color:#b4c3d8;line-height:1.6;max-width:820px;margin:8px 0 16px}.workflow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.workflow-step{border:1px solid #293b52;border-radius:11px;padding:12px;background:#0b121e}.workflow-step b{display:block;font-size:12px;margin-bottom:5px}.workflow-step span{font-size:11px;color:#9caec5;line-height:1.5}.model-grid{order:2;display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}.model-card{border:1px solid var(--line,#273448);background:var(--panel,#0c121c);border-radius:16px;padding:18px;min-width:0}.model-card h2{font-size:16px;margin:0}.section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px}.section-head p{font-size:12px;line-height:1.5;margin:5px 0 0;color:#9caec5}.count{font-size:11px;color:#a8b7cc;white-space:nowrap}.model-list{display:grid;gap:10px}.model-item{border:1px solid #25354a;border-radius:12px;padding:14px;display:grid;gap:9px;min-width:0}.model-item-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.model-item h3{margin:0;font-size:15px;overflow-wrap:anywhere}.model-meta{font-size:12px;color:#a8b7cc;overflow-wrap:anywhere;line-height:1.5}.model-tags{display:flex;gap:6px;flex-wrap:wrap}.model-tag,.state-pill{font-size:11px;padding:4px 7px;border:1px solid #30425a;border-radius:999px;color:#c6d5e9}.state-pill{color:#a9dfbc;border-color:#315b45}.state-pill.off{color:#f1c28a;border-color:#705331}.model-empty,.model-note{font-size:12px;color:#9caec5;line-height:1.6}.model-message{min-height:18px;font-size:13px;color:#9ddbb4;margin:12px 0 0}.model-message.error{color:#ffaaa6}.wide{grid-column:1/-1;order:-1}.callout{padding:12px;border-radius:10px;border:1px solid #344760;background:#101a29;color:#b9cbe2;font-size:12px;line-height:1.6;margin-top:12px}.callout strong{color:#e9f2ff}.factory-project{border-left:3px solid #628fcb}.danger{border-color:#704040;color:#ffc4bd}.spinner{opacity:.7}@media(max-width:820px){.model-grid{grid-template-columns:1fr}.workflow{grid-template-columns:repeat(2,minmax(0,1fr))}.model-page{padding:20px 12px 40px}}@media(max-width:440px){.workflow{grid-template-columns:1fr}.hero{padding:16px}}
 </style>
 </head>
 <body>
 <div id="login" class="model-login" hidden>
-<h2>Unlock Sophie</h2><p>Sign in to manage the model registry.</p>
+<h2>Unlock Sophie</h2><p>Sign in to open Model Studio.</p>
 <input id="accessPassword" type="password" autocomplete="current-password" placeholder="Access password">
 <button id="loginBtn" type="button"><span id="loginBtnText">Unlock</span></button>
 <div id="loginErr" class="loginerr" role="status" aria-live="polite"></div>
 </div>
 <main class="model-page" id="modelApp" hidden>
-<header class="model-top"><div><h1>Model Studio</h1><p>Register and manage models and adapters available to Sophie's orchestration layer.</p></div><div class="model-actions"><a class="model-button" href="/">← Back to Sophie</a><button class="model-button" id="refreshModels" type="button">Refresh</button></div></header>
-<div class="model-layout">
+<header class="model-top"><div><div class="eyebrow">SOPHIE · NEXUS-OMEGA</div><h1>Model Studio</h1><p>Available models and providers first; Sophie/Hermes-created capabilities are listed below. The build-workflow explanation is at the bottom.</p></div><div class="model-actions"><a class="model-button" href="/">← Back to chat</a><button class="model-button" id="refreshModels" type="button">↻ Refresh</button></div></header>
+<section class="hero">
+<div class="eyebrow">DESIGN → REVIEW → BUILD → VERIFY → REGISTER</div>
+<h2>Build what you need in the normal chat</h2>
+<p>Describe the model or capability you want in Sophie's chat. Sophie and Hermes should research it, prepare a blueprint, show it to you for review, and wait for your explicit approval before building. Only a capability created through Sophie's/Hermes' factory and verified by its build workflow should appear in the created list. Small apps such as a 2D animation editor can be registered as capabilities; that is different from training a new foundation model. Production deployment remains separate.</p>
+<div class="workflow">
+<div class="workflow-step"><b>01 · Describe</b><span>Tell Sophie what you want in the regular chat interface.</span></div>
+<div class="workflow-step"><b>02 · Review</b><span>Inspect and edit the blueprint before approving it.</span></div>
+<div class="workflow-step"><b>03 · Build & test</b><span>Hermes builds in the sandbox and verifies the result.</span></div>
+<div class="workflow-step"><b>04 · Register</b><span>Verified capabilities are listed here with their status.</span></div>
+</div>
+<div class="callout"><strong>Approval gate:</strong> no build or enable action should happen without explicit approval. This page displays the factory's recorded state; it does not pretend a draft or untested project is a working model.</div>
+</section>
+<div class="model-grid">
 <section class="model-card">
-<h2 id="formTitle">Add a model</h2>
-<form class="model-form" id="modelForm">
-<label>Display name<input name="name" required maxlength="100" placeholder="e.g. Flux Image Pro"></label>
-<label>Provider / service<input name="provider" required maxlength="100" placeholder="e.g. FAL, Hugging Face, local"></label>
-<label>Model ID<input name="model" required maxlength="180" placeholder="Provider's exact model identifier"></label>
-<label>Adapter type<select name="adapter"><option value="metadata-only">Metadata only (register first)</option><option value="hermes-cli">Hermes CLI</option><option value="openai-compatible">OpenAI-compatible API</option><option value="provider-router">Existing Sophie provider adapter</option></select></label>
-<label>Endpoint URL (optional)<input name="endpoint" type="url" placeholder="https://api.example.com/v1"></label>
-<label>Credential environment variable name (optional)<input name="envKey" maxlength="100" placeholder="e.g. FAL_KEY — never enter the secret itself"></label>
-<label>Capabilities (comma-separated)<input name="capabilities" placeholder="text, image, video, vision, audio" value="text"></label>
-<label>Notes<textarea name="notes" maxlength="1000" placeholder="Purpose, constraints, or setup notes"></textarea></label>
-<label><span><input name="enabled" type="checkbox" checked style="width:auto"> Enabled in registry</span></label>
-<div class="model-actions"><button class="primary" type="submit" id="saveModel">Add model</button><button type="button" id="cancelEdit" hidden>Cancel edit</button></div>
-<div id="formMessage" class="model-message" role="status" aria-live="polite"></div>
-</form>
-<p class="model-note">This registry stores model metadata, not API keys. Adding an entry makes it discoverable; it does not automatically implement an unsupported provider or guarantee that the model can run. Use a supported adapter or add an adapter implementation.</p>
+<div class="section-head"><div><h2>Created by Sophie &amp; Hermes</h2><p>Only capabilities built through Sophie's factory and registered after verification appear here. These can be small apps or tools—not necessarily new foundation models.</p></div><span id="capabilityCount" class="count">Loading…</span></div>
+<div id="capabilityList" class="model-list"><div class="model-empty">Loading created capabilities…</div></div>
+<div id="capabilityMessage" class="model-message" role="status" aria-live="polite"></div>
 </section>
 <section class="model-card">
-<h2>Registered models</h2><div id="modelCount" class="model-note"></div><div id="modelList" class="model-list"><div class="model-empty">Loading models…</div></div>
+<div class="section-head"><div><h2>Build pipeline</h2><p>Projects in draft, blueprint review, approval, build, or verification.</p></div><span id="projectCount" class="count">Loading…</span></div>
+<div id="projectList" class="model-list"><div class="model-empty">Loading factory projects…</div></div>
+<div class="callout">Projects appear here when the chat/factory workflow creates them. A project is not considered a registered, usable capability until the factory records successful verification and publication.</div>
+</section>
+<section class="model-card wide">
+<div class="section-head"><div><h2>Models available to Sophie</h2><p>Existing providers and adapters Sophie can use, including Gemini, Meta AI and Hermes. This is a read-only inventory; third-party models cannot be manually added here.</p></div><span id="modelCount" class="count">Loading…</span></div>
+<div id="modelList" class="model-list"><div class="model-empty">Loading system registry…</div></div>
+<div id="systemMessage" class="model-message" role="status" aria-live="polite"></div>
 </section>
 </div>
 </main>
