@@ -28,7 +28,7 @@ module.exports = {
         return factory.createProject({
           name: input.name, goal: input.goal,
           requirements: input.requirements, constraints: input.constraints,
-          createdBy: 'hermes-tool'
+          createdBy: 'sophie-hermes'
         });
       case 'list_projects':
         return factory.listProjects({ state: input.state });
