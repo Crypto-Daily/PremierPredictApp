@@ -16,11 +16,11 @@
 <div id="loginErr" class="loginerr" role="status" aria-live="polite"></div>
 </div>
 <main class="model-page" id="modelApp" hidden>
-<header class="model-top"><div><div class="eyebrow">SOPHIE · NEXUS-OMEGA</div><h1>Model Studio</h1><p>Your models and capabilities, created through Sophie—not a catalogue of third-party models to add manually.</p></div><div class="model-actions"><a class="model-button" href="/">← Back to chat</a><button class="model-button" id="refreshModels" type="button">↻ Refresh</button></div></header>
+<header class="model-top"><div><div class="eyebrow">SOPHIE · NEXUS-OMEGA</div><h1>Model Studio</h1><p>See the models Sophie can use and the tools she and Hermes have actually built. External providers are listed for visibility; custom entries must come from Sophie's verified build workflow.</p></div><div class="model-actions"><a class="model-button" href="/">← Back to chat</a><button class="model-button" id="refreshModels" type="button">↻ Refresh</button></div></header>
 <section class="hero">
 <div class="eyebrow">DESIGN → REVIEW → BUILD → VERIFY → REGISTER</div>
 <h2>Build what you need in the normal chat</h2>
-<p>Describe the model or capability you want in Sophie's chat. Sophie and Hermes should research it, prepare a blueprint, show it to you for review, and wait for your explicit approval before building. Only a verified result should appear as a created capability here. Creating a capability does not mean training a new foundation model or automatically deploying it.</p>
+<p>Describe the model or capability you want in Sophie's chat. Sophie and Hermes should research it, prepare a blueprint, show it to you for review, and wait for your explicit approval before building. Only a capability created through Sophie's/Hermes' factory and verified by its build workflow should appear in the created list. Small apps such as a 2D animation editor can be registered as capabilities; that is different from training a new foundation model. Production deployment remains separate.</p>
 <div class="workflow">
 <div class="workflow-step"><b>01 · Describe</b><span>Tell Sophie what you want in the regular chat interface.</span></div>
 <div class="workflow-step"><b>02 · Review</b><span>Inspect and edit the blueprint before approving it.</span></div>
@@ -31,7 +31,7 @@
 </section>
 <div class="model-grid">
 <section class="model-card">
-<div class="section-head"><div><h2>Created by you</h2><p>Capabilities registered by Sophie's factory after the build lifecycle.</p></div><span id="capabilityCount" class="count">Loading…</span></div>
+<div class="section-head"><div><h2>Created by Sophie &amp; Hermes</h2><p>Only capabilities built through Sophie's factory and registered after verification appear here. These can be small apps or tools—not necessarily new foundation models.</p></div><span id="capabilityCount" class="count">Loading…</span></div>
 <div id="capabilityList" class="model-list"><div class="model-empty">Loading created capabilities…</div></div>
 <div id="capabilityMessage" class="model-message" role="status" aria-live="polite"></div>
 </section>
@@ -41,7 +41,7 @@
 <div class="callout">Projects appear here when the chat/factory workflow creates them. A project is not considered a registered, usable capability until the factory records successful verification and publication.</div>
 </section>
 <section class="model-card wide">
-<div class="section-head"><div><h2>Models available to Sophie</h2><p>Models and adapters already present in the system registry. This list is read from the runtime; it is not a form for importing someone else's model.</p></div><span id="modelCount" class="count">Loading…</span></div>
+<div class="section-head"><div><h2>Models available to Sophie</h2><p>Existing providers and adapters Sophie can use, including Gemini, Meta AI and Hermes. This is a read-only inventory; third-party models cannot be manually added here.</p></div><span id="modelCount" class="count">Loading…</span></div>
 <div id="modelList" class="model-list"><div class="model-empty">Loading system registry…</div></div>
 <div id="systemMessage" class="model-message" role="status" aria-live="polite"></div>
 </section>
