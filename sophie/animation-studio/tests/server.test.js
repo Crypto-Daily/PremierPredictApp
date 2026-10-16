@@ -1,6 +1,5 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
-const temp=fs.mkdtemp(path.join(os.tmpdir(),'sophie-animation-tests-'));
 process.env.ANIMATION_STUDIO_DATA_DIR=path.join(os.tmpdir(),'sophie-animation-test-data-'+process.pid);
 const {server}=require('../src/index.js');
 let base;
