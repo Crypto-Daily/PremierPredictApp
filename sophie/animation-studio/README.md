@@ -8,6 +8,7 @@ A standalone workspace for an AI-assisted, FlipaClip-style 2D frame-by-frame ani
 - Save/load projects to local JSON files.
 - Import selectable-text PDFs using Poppler pdftotext; scanned PDFs require OCR.
 - Convert story text into editable heuristic scene drafts.
+- Optional server-side image-generation adapter for an OpenAI-compatible PNG endpoint (provider credentials are not bundled).
 - Export MP4, WebM and GIF through FFmpeg.
 - Node.js built-ins only; no npm runtime dependencies.
 - Bounded request bodies, project validation, safe project IDs and tests.
@@ -27,7 +28,7 @@ npm start
 Open http://127.0.0.1:8789. Projects are saved under data/projects/ (git-ignored). The service binds to loopback by default. Do not expose it publicly without authentication and network controls.
 
 ## Current capability boundary
-Real AI image generation, character consistency, motion synthesis/interpolation, OCR, audio/lip-sync, layers and advanced timeline editing are not implemented yet. Scene drafting is deterministic heuristic processing, not AI understanding. Video rendering repeats existing drawn frames to approximate scene duration. See docs/ARCHITECTURE.md.
+The image-generation backend adapter is present but still needs a compatible provider configured and a browser control added. Character consistency, motion synthesis/interpolation, OCR for scanned PDFs, audio/lip-sync, layers and advanced timeline editing are not implemented yet. Story drafting remains heuristic. Scene drafting is deterministic heuristic processing, not AI understanding. Video rendering repeats existing drawn frames to approximate scene duration. See docs/ARCHITECTURE.md.
 
 ## Isolation
 All implementation stays under sophie/animation-studio/. Sophie/Hermes core code, existing providers, production configuration and the live assistant are not changed. Later integration must be a separate reviewed phase.
