@@ -63,7 +63,15 @@ export function renderArtifacts(data, root) {
 
 export function initArtifacts({ app, root, refresh }) {
   const button = document.querySelector('#artifactBtn');
-  document.querySelector('#refreshArtifacts')?.addEventListener('click', async () => {\n    const refreshButton = document.querySelector('#refreshArtifacts');\n    if (refreshButton) refreshButton.disabled = true;\n    try { await refresh?.(); }\n    catch (error) { root.innerHTML = '<div class="empty">Could not refresh artifacts: ' + safe(error.message) + '</div>'; }\n    finally { if (refreshButton) refreshButton.disabled = false; }\n  });\n\n  button?.addEventListener('click', () => {
+  document.querySelector('#refreshArtifacts')?.addEventListener('click', async () => {
+    const refreshButton = document.querySelector('#refreshArtifacts');
+    if (refreshButton) refreshButton.disabled = true;
+    try { await refresh?.(); }
+    catch (error) { root.innerHTML = '<div class="empty">Could not refresh artifacts: ' + safe(error.message) + '</div>'; }
+    finally { if (refreshButton) refreshButton.disabled = false; }
+  });
+
+  button?.addEventListener('click', () => {
     app.classList.add('inspector-open');
     app.classList.remove('menu-open');
     root.scrollIntoView({ behavior: 'smooth' });
