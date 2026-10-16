@@ -10,10 +10,10 @@ function extension(path) {
 
 export function renderArtifacts(data, root) {
   const artifacts = data?.artifacts || [];
-  root.innerHTML = artifacts.slice(0, 8).map(item => {
+  root.innerHTML = artifacts.slice(0, 100).map(item => {
     const raw = item.path || item.name || '';
     const path = encodeURIComponent(raw);
-    const name = safe(item.name || item.path || 'artifact');
+    const name = safe(item.name || String(item.path || 'artifact').split('/').pop());
     return '<div class="artifact-row">' +
       '<a class="artifact-link" href="/api/artifacts/download?path=' + path +
       '" target="_blank" rel="noopener">' + name + '</a>' +
@@ -35,14 +35,14 @@ export function renderArtifacts(data, root) {
 
       const ext = extension(rawPath);
       if (['png','jpg','jpeg','webp','gif','svg'].includes(ext)) {
-        const src = '/api/artifacts/download?path=' + encodeURIComponent(rawPath);
+        const src = '/api/artifacts/download?path=' + encodeURIComponent(rawPath) + '&v=' + Date.now();
         body.innerHTML = '<img src="' + src + '" alt="Artifact preview">';
         return;
       }
 
       if (['txt','md','json','csv','log','js','ts','css','html'].includes(ext)) {
         try {
-          const response = await fetch('/api/artifacts/download?path=' + encodeURIComponent(rawPath), {
+          const response = await fetch('/api/artifacts/download?path=' + encodeURIComponent(rawPath) + '&v=' + Date.now(), {
             credentials: 'same-origin'
           });
           if (!response.ok) throw new Error('Preview unavailable.');
@@ -61,9 +61,9 @@ export function renderArtifacts(data, root) {
   });
 }
 
-export function initArtifacts({ app, root }) {
+export function initArtifacts({ app, root, refresh }) {
   const button = document.querySelector('#artifactBtn');
-  button?.addEventListener('click', () => {
+  document.querySelector('#refreshArtifacts')?.addEventListener('click', async () => {\n    const refreshButton = document.querySelector('#refreshArtifacts');\n    if (refreshButton) refreshButton.disabled = true;\n    try { await refresh?.(); }\n    catch (error) { root.innerHTML = '<div class="empty">Could not refresh artifacts: ' + safe(error.message) + '</div>'; }\n    finally { if (refreshButton) refreshButton.disabled = false; }\n  });\n\n  button?.addEventListener('click', () => {
     app.classList.add('inspector-open');
     app.classList.remove('menu-open');
     root.scrollIntoView({ behavior: 'smooth' });
