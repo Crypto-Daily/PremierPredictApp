@@ -1,43 +1,32 @@
 # Sophie Animation Studio
 
-A standalone workspace for building a FlipaClip-style, AI-assisted 2D frame-by-frame animation and video-generation studio.
+A standalone workspace for an AI-assisted, FlipaClip-style 2D frame-by-frame animation studio. The first increment is a usable manual drawing/editor service and a foundation for subsequent AI integration; it is not a finished AI animation model.
 
-## Isolation rule
+## Features in this increment
+- Browser canvas with brush/eraser, adjustable brush, scenes and scene descriptions.
+- Frame timeline, add/duplicate frame, previous-frame onion skin and playback.
+- Save/load projects to local JSON files.
+- Import selectable-text PDFs using Poppler pdftotext; scanned PDFs require OCR.
+- Convert story text into editable heuristic scene drafts.
+- Export MP4, WebM and GIF through FFmpeg.
+- Node.js built-ins only; no npm runtime dependencies.
+- Bounded request bodies, project validation, safe project IDs and tests.
 
-All implementation work for this project belongs under `sophie/animation-studio/`. Do not modify Sophie or Hermes core behavior, existing provider implementations, model-factory code, deployment configuration, or production services as part of the standalone build. Integration with Sophie is a later, separately reviewed phase.
+## Install and run
+Requirements: Node.js 20+. Optional: Poppler for PDF text extraction and FFmpeg for video export.
 
-## Intended workflow
+```bash
+cd sophie/animation-studio
+npm install
+npm test
+npm run check
+npm start
+```
 
-1. Import a story/scenario PDF and extract text and page imagery.
-2. Turn the source into an editable story outline, scenes, shot descriptions, and character/environment references.
-3. Generate and manage consistent character and background assets through provider adapters.
-4. Create editable keyframes and in-between frames on a frame timeline, with layers and onion-skin previews.
-5. Compose scenes, optionally add dialogue/audio, and render MP4/WebM/GIF outputs.
-6. Save projects and assets with traceable source references, progress reporting, and recoverable failures.
+Open http://127.0.0.1:8789. Projects are saved under data/projects/ (git-ignored). The service binds to loopback by default. Do not expose it publicly without authentication and network controls.
 
-## Design boundaries
+## Current capability boundary
+Real AI image generation, character consistency, motion synthesis/interpolation, OCR, audio/lip-sync, layers and advanced timeline editing are not implemented yet. Scene drafting is deterministic heuristic processing, not AI understanding. Video rendering repeats existing drawn frames to approximate scene duration. See docs/ARCHITECTURE.md.
 
-- **Standalone service/UI:** this workspace owns its project data, APIs, job lifecycle, editor, and rendering pipeline.
-- **Provider adapters:** AI image, story, motion/interpolation, and optional audio providers are replaceable; provider credentials stay in environment/configuration and must never be committed.
-- **Deterministic rendering:** editable frames and scene timing are project data; final video rendering must not depend on an AI provider being available.
-- **Reuse without coupling:** existing repository capabilities may be reused only through clear interfaces. Do not duplicate or alter the Sophie/Hermes orchestration engine.
-- **Honest capability reporting:** do not label a hosted-model workflow as a newly trained foundation model. Keep the architecture open for a separately trained model if that becomes a defined requirement.
-
-## Workspace map
-
-- `src/` — application modules and service entry points.
-- `tests/` — unit, integration, and end-to-end tests.
-- `docs/` — architecture decisions, API contracts, data model, setup, and operational notes.
-- `package.json` — isolated Node.js workspace scripts.
-
-## Build sequence
-
-1. Complete the repository/infrastructure audit before selecting dependencies or implementing features.
-2. Define project/scene/frame/asset schemas and provider contracts.
-3. Implement PDF ingestion and story-to-scene planning.
-4. Implement asset/reference management and the frame editor/timeline.
-5. Implement motion/interpolation and deterministic FFmpeg rendering.
-6. Add tests, limits, cancellation/retry behavior, and local setup instructions.
-7. Review standalone functionality before planning any optional Sophie integration.
-
-This folder scaffold does not install dependencies, deploy services, change the live Sophie application, or connect the studio to Sophie yet.
+## Isolation
+All implementation stays under sophie/animation-studio/. Sophie/Hermes core code, existing providers, production configuration and the live assistant are not changed. Later integration must be a separate reviewed phase.
