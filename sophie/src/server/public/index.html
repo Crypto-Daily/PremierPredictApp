@@ -125,6 +125,13 @@
   </section>
 </div>
 
+<div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-labelledby="imageViewerTitle">
+  <div class="image-viewer-dialog">
+    <div class="image-viewer-toolbar"><div id="imageViewerTitle">Artifact preview</div><div class="image-viewer-actions"><a id="imageViewerOpenFile" href="#" target="_blank" rel="noopener">Open file</a><button id="imageViewerClose" type="button" aria-label="Close image viewer">×</button></div></div>
+    <div class="image-viewer-stage" id="imageViewerStage"></div>
+  </div>
+</div>
+
 <div class="name-modal" id="nameModal" hidden>
   <div class="name-dialog" role="dialog" aria-modal="true" aria-labelledby="nameModalTitle">
     <button class="name-close" id="nameCancel" type="button" aria-label="Close">×</button>
