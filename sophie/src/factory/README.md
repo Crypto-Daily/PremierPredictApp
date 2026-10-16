@@ -1,6 +1,6 @@
 # Sophie Capability Factory
 
-This feature implements the approved capability lifecycle for Sophie and Hermes: create a project, collect research, draft and revise a blueprint, require explicit approval, verify submitted source files in an isolated sandbox, register passing capabilities disabled by default, and expose registered capability discovery and invocation.
+This feature implements the supervised capability lifecycle for Sophie and Hermes: create a project, collect research, draft and revise a blueprint, require explicit approval, verify submitted source files in an isolated sandbox, register passing capabilities disabled by default, and expose registered capability discovery and invocation. Model Studio separates existing provider models (for example Gemini and Meta AI) from custom apps/tools created through this factory. The factory tool records Sophie/Hermes as the creator.
 
 ## Workflow
 
@@ -36,7 +36,7 @@ All these routes are behind the server's existing API authorization middleware.
 
 - This is a capability factory, not a system that trains a new foundation model. Model endpoints can be registered as capabilities; training/fine-tuning needs separate infrastructure.
 - The factory tool can create/research/blueprint projects and submit caller-provided files for sandbox verification. It cannot approve a blueprint or enable a capability.
-- The source files tested are those supplied in the verification request. Passing tests do not prove a third party's claims or model quality.
+- The source files tested are those supplied in the verification request. Passing tests do not prove a third party's claims or model quality. This branch is a supervised factory foundation, not yet a fully autonomous prompt-to-production app builder: Hermes must supply the source files, and production deployment remains a separate step.
 - The Docker sandbox image must already exist locally; it is not pulled automatically.
 - Runtime capability execution currently supports the `http-json` adapter and an `openai-compatible` label through the same JSON HTTP invocation interface. Other registered adapter labels are not executed by the current executor.
 - The JSON registry is suitable for the current single-process lifecycle foundation but does not implement cross-process locking.
