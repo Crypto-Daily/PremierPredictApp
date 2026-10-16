@@ -485,7 +485,7 @@ const { ensureAccess } = initLogin({
 });
 
 initRecents({ api, app, refresh: loadWorkspace });
-initArtifacts({ app, root: $('#artifacts') });
+initArtifacts({\n  app,\n  root: $('#artifacts'),\n  refresh: async () => renderArtifacts(await api('/api/artifacts'), $('#artifacts'))\n});
 
 $('#clearUploads')?.addEventListener('click', () => {
   uploadedFiles.length = 0;
