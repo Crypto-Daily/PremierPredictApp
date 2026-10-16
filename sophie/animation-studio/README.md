@@ -18,6 +18,7 @@ Requirements: Node.js 20+. Optional: Poppler for PDF text extraction and FFmpeg 
 ```bash
 cd sophie/animation-studio
 npm install
+npm run doctor
 npm test
 npm run check
 npm start
