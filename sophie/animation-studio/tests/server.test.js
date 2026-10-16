@@ -7,7 +7,7 @@ let base;
 test('HTTP service health and project APIs work',async t=>{
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve)});
   base='http://127.0.0.1:'+server.address().port;
-  t.after(async()=>{await new Promise(resolve=>server.close(resolve));await fs.rm(process.env.ANIMATION_STUDIO_DATA_DIR,{recursive:true,force:true});await fs.rm(temp,{recursive:true,force:true});});
+  t.after(async()=>{await new Promise(resolve=>server.close(resolve));await fs.rm(process.env.ANIMATION_STUDIO_DATA_DIR,{recursive:true,force:true});});
   const health=await fetch(base+'/api/health').then(r=>r.json());
   assert.equal(health.ok,true);
   const created=await fetch(base+'/api/projects',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:'API test'})});
