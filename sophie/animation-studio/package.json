@@ -1,6 +1,6 @@
 {
   "name": "sophie-animation-studio",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Standalone AI-assisted 2D frame-by-frame animation studio",
   "type": "commonjs",
