@@ -86,8 +86,16 @@ export function initArtifacts({ app, root, refresh }) {
     root.scrollIntoView({ behavior: 'smooth' });
   });
 
-  document.querySelector('#previewClose')?.addEventListener('click', () => {
-    const preview = document.querySelector('#artifactPreview');
-    if (preview) preview.hidden = true;
+  const viewer = document.querySelector('#imageViewer');
+  const closeViewer = () => {
+    if (viewer) viewer.hidden = true;
+    document.body.classList.remove('image-viewer-open');
+  };
+  document.querySelector('#imageViewerClose')?.addEventListener('click', closeViewer);
+  viewer?.addEventListener('click', event => {
+    if (event.target === viewer) closeViewer();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && viewer && !viewer.hidden) closeViewer();
   });
 }
