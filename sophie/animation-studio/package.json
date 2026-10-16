@@ -9,8 +9,9 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "doctor": "node scripts/doctor.js",
+    "setup:local-ai": "bash scripts/setup-local-ai.sh",
     "test": "node --test",
-    "check": "node --check src/index.js && node --check src/lib/project.js && node --check src/lib/storyPlanner.js && node --check src/lib/renderer.js && node --check src/lib/imageProvider.js && node --check src/public/app.js && node --check scripts/doctor.js"
+    "check": "node --check src/index.js && node --check src/lib/project.js && node --check src/lib/storyPlanner.js && node --check src/lib/renderer.js && node --check src/lib/imageProvider.js && node --check src/lib/localImageProvider.js && node --check src/public/app.js && node --check scripts/doctor.js"
   },
   "engines": { "node": ">=20" }
 }
