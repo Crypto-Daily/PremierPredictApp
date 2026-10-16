@@ -1,0 +1,13 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {newProject,validateProject,validateImageData}=require('../src/lib/project');
+const {planStory,extractNames}=require('../src/lib/storyPlanner');
+const {imageDataToBuffer}=require('../src/lib/renderer');
+test('newProject creates a valid editable project',()=>{const p=validateProject(newProject('Demo'));assert.equal(p.title,'Demo');assert.equal(p.scenes.length,1);assert.equal(p.fps,12)});
+test('project validation clamps dimensions and frame rate',()=>{const p=validateProject({title:'x',fps:1000,width:1,height:99999,scenes:[]});assert.equal(p.fps,60);assert.equal(p.width,64);assert.equal(p.height,2160)});
+test('project validation rejects unsafe frame data URLs',()=>{assert.throws(()=>validateImageData('data:text/html;base64,PHNjcmlwdD4='));assert.throws(()=>validateImageData('not-a-data-url'))});
+test('project validation rejects excessive scene count',()=>{assert.throws(()=>validateProject({scenes:Array.from({length:501},()=>({}))}),/scene limit/)});
+test('story planner makes editable draft scenes from paragraphs',()=>{const p=planStory('Ada enters the room.\n\nThe door closes behind her.');assert.equal(p.sceneCount,2);assert.equal(p.mode,'heuristic-draft');assert.match(p.scenes[0].description,/Ada enters/)});
+test('story planner rejects empty input',()=>assert.throws(()=>planStory('   '),/No readable story/));
+test('image decoder accepts PNG data URLs',()=>{const r=imageDataToBuffer('data:image/png;base64,aGVsbG8=');assert.equal(r.extension,'png');assert.equal(r.buffer.toString(),'hello')});
+test('name extraction returns capitalized candidate names',()=>assert.ok(extractNames('Ada visits London. Ada meets Morgan.').includes('Ada')));
