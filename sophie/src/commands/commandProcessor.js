@@ -424,16 +424,21 @@ class CommandProcessor {
         throw error;
       }
 
-      const text =
-        'I could not complete that action through my execution engine. ' +
-        'Nothing is being claimed as completed unless the tool actually succeeded.';
+      // A failed Hermes session must not terminate an ordinary conversation.
+      // Continue through Sophie's configured conversational provider path below.
+      // For execution requests, preserve the failure rather than pretending a
+      // file or external action succeeded.
+      const conversationalIntent = ['CHAT', 'MEMORY', 'VISION'].includes(intent);
+      if (!conversationalIntent) {
+        const detail = error?.code === 'NEXUS_VERIFICATION_FAILED'
+          ? 'Hermes could not verify that the requested action completed.'
+          : 'Hermes execution is currently unavailable.';
+        const text = detail + ' No file or external action is being claimed as completed. You can retry the task after the execution engine is available.';
+        this.memory.addMessage('assistant', text);
+        return { type: 'response', text, executionError: true };
+      }
 
-      this.memory.addMessage('assistant', text);
-
-      return {
-        type: 'response',
-        text
-      };
+      console.warn('[AGENT] Falling back to conversational provider after Hermes failure.');
     }
 
     try {
