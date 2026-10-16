@@ -8,8 +8,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "doctor": "node scripts/doctor.js",
     "test": "node --test",
-    "check": "node --check src/index.js && node --check src/lib/project.js && node --check src/lib/storyPlanner.js && node --check src/lib/renderer.js && node --check src/public/app.js"
+    "check": "node --check src/index.js && node --check src/lib/project.js && node --check src/lib/storyPlanner.js && node --check src/lib/renderer.js && node --check src/public/app.js && node --check scripts/doctor.js"
   },
   "engines": { "node": ">=20" }
 }
