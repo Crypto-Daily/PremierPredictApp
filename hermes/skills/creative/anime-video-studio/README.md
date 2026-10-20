@@ -1,0 +1,1 @@
+Hermes anime video studio feature scaffold. This directory will contain the screenplay parser and an isolated Remotion rendering template.
