@@ -22,8 +22,29 @@ cd /tmp/hermes-anime-render-test
 npm install
 python3 /path/to/anime-video-studio/scripts/parse_anime_script.py /path/to/anime-video-studio/examples/sample-script.txt --out storyboard.json --fps 12 --seconds-per-scene 5
 python3 -c 'import json; d=json.load(open("storyboard.json")); json.dump({"storyboard":d},open("props.json","w"))'
+mkdir -p out
 npx remotion render src/index.jsx AnimeVideo out/anime-preview.mp4 --props-file=props.json
 test -s out/anime-preview.mp4
 ```
 
-Replace `/path/to/anime-video-studio` with the actual path to this skill directory. The initial renderer produces storyboard-style motion graphics; it does not generate anime artwork by itself. For illustrated scenes, use an available Hermes image/video provider or user-supplied assets and populate each scene's `image` or `background` field. Preserve the source script and use a project-specific output directory.
+Replace `/path/to/anime-video-studio` with the actual path to this skill directory.
+
+### Ubuntu browser fallback
+
+If Remotion downloads Chrome Headless Shell but then reports `No browser found for rendering frames`, inspect the ZIP and extract it in the temporary template:
+
+```bash
+cd /tmp/hermes-anime-render-test
+unzip -t node_modules/.remotion/chrome-headless-shell/chrome-headless-shell-linux64.zip
+unzip -o node_modules/.remotion/chrome-headless-shell/chrome-headless-shell-linux64.zip -d node_modules/.remotion/chrome-headless-shell
+BROWSER="$PWD/node_modules/.remotion/chrome-headless-shell/chrome-headless-shell-linux64/chrome-headless-shell"
+chmod +x "$BROWSER"
+"$BROWSER" --version
+npx remotion render src/index.jsx AnimeVideo out/anime-preview.mp4 --props-file=props.json --browser-executable="$BROWSER"
+```
+
+The `--browser-executable` path is specific to the current temporary project; do not hard-code it into the live Sophie deployment.
+
+## Scope and limitations
+
+The initial renderer produces storyboard-style motion graphics; it does not generate anime artwork by itself. For illustrated scenes, use an available Hermes image/video provider or user-supplied assets and populate each scene's `image` or `background` field. PDF upload and extraction, a richer storyboard editor, character consistency, dialogue/audio, and actual image generation are separate implementation stages. Preserve the source script and use a project-specific output directory.
