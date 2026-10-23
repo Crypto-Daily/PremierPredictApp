@@ -1,0 +1,15 @@
+{
+  "name": "hermes-anime-video-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Isolated Remotion starter for rendering Hermes storyboard JSON into MP4",
+  "scripts": {
+    "render": "remotion render src/index.jsx AnimeVideo out/anime-preview.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.409",
+    "remotion": "4.0.409",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  }
+}
