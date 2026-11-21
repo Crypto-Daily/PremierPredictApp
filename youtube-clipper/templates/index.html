@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Video clips</title><link rel="stylesheet" href="/static/style.css"></head>
-<body><header><h1>Video clips</h1><form method="post" action="/logout"><button class="secondary" type="submit">Sign out</button></form></header>
+<body><header><h1>Video clips</h1><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary" type="submit">Sign out</button></form></header>
 <main>
 <section class="panel"><h2>Create clips</h2><form id="clip-form">
 <label>YouTube video URL<input id="url" type="url" placeholder="https://www.youtube.com/watch?v=…" required></label>
