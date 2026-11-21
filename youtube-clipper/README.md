@@ -115,3 +115,28 @@ Export cookies from your own browser session in Netscape format, then upload the
 - Jobs are processed in background threads. A process restart stops active jobs; completed files remain in the data directory.
 - The source video is removed from temporary work storage after rendering. Generated MP4s and job metadata remain.
 - Use HTTPS and a strong password. The app has no public registration or multi-user feature.
+
+
+## Desktop browser connector (Edge / Chrome)
+
+The optional companion extension lets you open a YouTube video in your normal signed-in browser and explicitly send its URL to the private Clipper. It does **not** embed YouTube or automate sign-in: YouTube blocks or limits many embedded browsing/login flows, and an iframe cannot safely share the browser's authenticated session with the Flask app.
+
+### Install the extension in Microsoft Edge
+
+1. Open `edge://extensions`.
+2. Enable **Developer mode**.
+3. Choose **Load unpacked**.
+4. Select the repository folder `youtube-clipper/browser-extension` (the folder containing `manifest.json`).
+5. Pin **YouTube Clipper Connector** to the Edge toolbar.
+
+### Pair and send a video
+
+1. Sign in to the Clipper dashboard over HTTPS.
+2. In **Connect your desktop browser**, click **Generate one-time pairing code**.
+3. Open the extension, enter the Clipper's HTTPS address and the one-time code, then choose **Connect browser**. Edge asks permission for that specific Clipper origin.
+4. Open a YouTube video you own or are authorized to process.
+5. Click the extension and choose **Send this YouTube video**. The job appears in the existing Clipper queue.
+
+The pairing code expires after 10 minutes and can be used once. Pairing creates a random bearer token; only its SHA-256 hash is stored in the private data directory. Pairing again replaces the previous token. The extension reads only the active tab URL after an explicit click; it does not read page contents, inspect cookies, or collect browsing history. Use HTTPS for the Clipper address. Revoke access by pairing a new extension/browser or removing `data/private/browser-extension-token.sha256` and restarting the app.
+
+This connector hands off the video URL to the existing yt-dlp pipeline. It does not bypass YouTube restrictions or grant permission to download content. YouTube may still require the user to use a permitted download path or the existing private cookie-upload flow.
