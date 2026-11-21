@@ -293,7 +293,7 @@ def upload_cookies():
 @app.get("/clips/<path:filename>")
 def download_clip(filename):
     require_login()
-    if not re.fullmatch(r"[a-f0-9]{32}_\d{2}\.mp4", filename):
+    if not (len(filename) == 39 and all(ch in "0123456789abcdef" for ch in filename[:32]) and filename[32] == "_" and filename[33:35].isdigit() and filename[35:] == ".mp4"):
         abort(404)
     return send_from_directory(OUTPUTS, filename, as_attachment=True)
 
