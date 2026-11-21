@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Clipper Connector",
+  "version": "1.0.0",
+  "description": "Send the active YouTube video to your private YouTube Clipper.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["https://*/*"],
+  "action": {
+    "default_title": "Send YouTube video to Clipper",
+    "default_popup": "popup.html"
+  }
+}
