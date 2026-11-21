@@ -16,8 +16,11 @@ $("pair").addEventListener("click", async () => {
     $("status").textContent = "Enter your HTTPS Clipper address and pairing code.";
     return;
   }
-  $("status").textContent = "Connecting…";
+  $("status").textContent = "Requesting access to your Clipper address…";
   try {
+    const allowed = await chrome.permissions.request({origins: [server + "/*"]});
+    if (!allowed) throw new Error("Permission was not granted for this Clipper address.");
+    $("status").textContent = "Connecting…";
     const response = await fetch(server + "/api/browser/pair", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({code})
