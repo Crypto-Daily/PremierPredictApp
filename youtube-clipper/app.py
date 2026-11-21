@@ -333,7 +333,52 @@ def browser_extension_cors(response):
     return response
 
 
+def run_cloudflare_tunnel():
+    """Keep the Quick Tunnel attached to this PM2-managed app process."""
+    binary = shutil.which("cloudflared")
+    if not binary:
+        raise SystemExit("cloudflared is not installed or is missing from PATH.")
+
+    stop_tunnel = threading.Event()
+    tunnel_process = [None]
+
+    def launch_tunnel():
+        print("[tunnel] Starting Cloudflare Quick Tunnel for http://127.0.0.1:8765", flush=True)
+        tunnel_process[0] = subprocess.Popen(
+            [binary, "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:8765"],
+            stdin=subprocess.DEVNULL,
+        )
+
+    def supervise_tunnel():
+        while not stop_tunnel.wait(5):
+            process = tunnel_process[0]
+            if process is not None and process.poll() is not None:
+                print(f"[tunnel] cloudflared exited ({process.returncode}); restarting in 5 seconds.", flush=True)
+                if stop_tunnel.wait(5):
+                    break
+                launch_tunnel()
+
+    def shutdown(signum, frame):
+        print("[tunnel] Stopping Cloudflare Tunnel with the Clipper.", flush=True)
+        stop_tunnel.set()
+        process = tunnel_process[0]
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        raise SystemExit(0)
+
+    launch_tunnel()
+    threading.Thread(target=supervise_tunnel, name="cloudflared-supervisor", daemon=True).start()
+    import signal
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
+
+
 if __name__ == "__main__":
     if not PASSWORD and not PASSWORD_HASH:
         raise SystemExit("Set APP_PASSWORD or APP_PASSWORD_HASH before starting the server.")
-    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "8765")), debug=False)
+    run_cloudflare_tunnel()
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "8765")), debug=False, use_reloader=False)
