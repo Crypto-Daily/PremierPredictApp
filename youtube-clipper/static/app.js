@@ -64,3 +64,21 @@ $("cookie-form").addEventListener("submit", async (event) => {
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 }
+
+
+$("pair-browser").addEventListener("click", async () => {
+  $("pair-browser").disabled = true;
+  $("pair-code").textContent = "Generating a one-time code…";
+  try {
+    const response = await fetch("/api/browser/pairing", {
+      method: "POST", headers
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not generate pairing code.");
+    $("pair-code").textContent = "Pairing code (valid for 10 minutes): " + data.code;
+  } catch (error) {
+    $("pair-code").textContent = error.message;
+  } finally {
+    $("pair-browser").disabled = false;
+  }
+});
