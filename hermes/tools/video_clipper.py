@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 ENERGY_WORDS = {
-    "amazing", " unbelievable", "important", "secret", "finally", "never",
+    "amazing", "unbelievable", "important", "secret", "finally", "never",
     "always", "mistake", "best", "worst", "incredible", "crazy", "shocking",
     "why", "how", "truth", "proof", "win", "fail", "money", "free",
 }
@@ -101,7 +101,7 @@ def transcribe(video: Path, workdir: Path, model: str) -> tuple[list[dict[str, A
         raise RuntimeError("Transcript mode needs the optional openai-whisper CLI. Install it with: pip install -U openai-whisper")
     output = workdir / "transcript"
     output.mkdir(exist_ok=True)
-    run(["whisper", str(video), "--model", model, "--output_format", "json", "--output_format", "srt", "--output_dir", str(output)])
+    run(["whisper", str(video), "--model", model, "--output_format", "all", "--output_dir", str(output)])
     json_files = list(output.glob("*.json"))
     if not json_files:
         raise RuntimeError("Whisper did not produce a JSON transcript.")
