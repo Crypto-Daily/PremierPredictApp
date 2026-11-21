@@ -305,6 +305,19 @@ def health():
     return jsonify(status="ok")
 
 
+# Browser companion extension: explicit, user-initiated URL handoff only.
+from browser_api import pairing_bp
+app.config.update(
+    CLIPPER_DATA_DIR=str(DATA),
+    CLIPPER_JOBS_DIR=str(JOBS),
+    CLIPPER_JOBS=jobs,
+    CLIPPER_JOBS_LOCK=jobs_lock,
+    CLIPPER_PROCESS_VIDEO=process_video,
+    CLIPPER_VALID_YOUTUBE_URL=valid_youtube_url,
+)
+app.register_blueprint(pairing_bp)
+
+
 if __name__ == "__main__":
     if not PASSWORD and not PASSWORD_HASH:
         raise SystemExit("Set APP_PASSWORD or APP_PASSWORD_HASH before starting the server.")
