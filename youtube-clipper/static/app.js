@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
-const headers = {"Content-Type":"application/json","X-CSRF-Token":window.CLIPPER_CSRF};
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+const headers = {"Content-Type":"application/json","X-CSRF-Token":csrfToken};
 let pollTimer = null;
 $("clip-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -53,7 +54,7 @@ $("cookie-form").addEventListener("submit", async (event) => {
   const form = new FormData(); form.append("cookies", file);
   $("cookie-status").textContent = "Uploading securely…";
   try {
-    const response = await fetch("/api/cookies", {method:"POST",headers:{"X-CSRF-Token":window.CLIPPER_CSRF},body:form});
+    const response = await fetch("/api/cookies", {method:"POST",headers:{"X-CSRF-Token":csrfToken},body:form});
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Upload failed.");
     $("cookie-status").textContent = data.message;
