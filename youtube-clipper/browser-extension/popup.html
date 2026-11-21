@@ -1,17 +1,17 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YouTube Clipper Connector</title><link rel="stylesheet" href="popup.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YouTube Clipper Cookie Connector</title><link rel="stylesheet" href="popup.css"></head>
 <body>
   <main>
     <h1>YouTube Clipper</h1>
     <p id="connection" class="muted">Not connected</p>
-    <label>Clipper address<input id="server" type="url" placeholder="https://your-clipper.example.com"></label>
-    <label>Pairing code<input id="code" type="text" autocomplete="off" placeholder="Paste code from Clipper"></label>
+    <label>Private Clipper HTTPS address<input id="server" type="url" placeholder="https://your-clipper.example.com"></label>
+    <label>One-time pairing code<input id="code" type="text" autocomplete="off" placeholder="Paste code from Clipper"></label>
     <button id="pair">Connect browser</button>
     <hr>
-    <button id="send" disabled>Send this YouTube video</button>
+    <button id="import" disabled>Import my YouTube login</button>
     <p id="status" role="status"></p>
-    <p class="hint">Only the active video's URL is sent, and only when you press the button. Browser cookies and page contents are never collected.</p>
+    <p class="hint">Only cookies belonging to youtube.com are read, and only after you click Import. They are sent over HTTPS to the Clipper address you approved and stored privately for yt-dlp. No other websites' cookies or page contents are accessed.</p>
   </main>
   <script src="popup.js"></script>
 </body></html>
