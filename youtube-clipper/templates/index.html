@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Video clips</title><link rel="stylesheet" href="/static/style.css"></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf }}"><title>Video clips</title><link rel="stylesheet" href="/static/style.css"></head>
 <body><header><h1>Video clips</h1><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary" type="submit">Sign out</button></form></header>
 <main>
 <section class="panel"><h2>Create clips</h2><form id="clip-form">
@@ -12,4 +12,4 @@
 <section class="panel"><h2>YouTube cookies (only if YouTube asks you to sign in)</h2><p class="muted">Upload your own exported Netscape-format cookies file. It is stored outside the public web folder with private file permissions and is never included in Git.</p><form id="cookie-form"><input type="file" id="cookies" accept=".txt,.cookies" required><button class="secondary" type="submit">Save cookies privately</button></form><p id="cookie-status" class="muted"></p></section>
 <section class="panel"><h2>Created clips</h2><div id="results" class="results"><p class="muted">Your finished clips will appear here.</p></div></section>
 <p class="muted footnote">Highlight selection is transcript-based and heuristic. Always review clips and confirm you have permission to use the source video.</p>
-</main><script>window.CLIPPER_CSRF={{ csrf|tojson }};</script><script src="/static/app.js" defer></script></body></html>
+</main><script src="/static/app.js" defer></script></body></html>
