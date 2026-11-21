@@ -218,6 +218,8 @@ def login():
 @app.post("/logout")
 def logout():
     require_login()
+    if request.form.get("csrf") != session.get("csrf"):
+        abort(403)
     session.clear()
     return redirect(url_for("login_page"))
 
