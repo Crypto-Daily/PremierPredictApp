@@ -1,14 +1,16 @@
-"""Secure one-time pairing and explicit YouTube-cookie import for the Clipper extension.
+"""Pair a local browser extension with the private clipper instance.
 
-The extension only reads cookies scoped to youtube.com after the user clicks
-Import. It never reads cookies for unrelated sites or sends them anywhere else.
+The extension only submits the active YouTube URL after an explicit user click.
+It never reads, exports, or transmits browser cookies.
 """
 from __future__ import annotations
 
 import hashlib
+import json
 import secrets
 import threading
 import time
+import uuid
 from pathlib import Path
 
 from flask import Blueprint, abort, current_app, jsonify, request, session
@@ -59,11 +61,11 @@ def pair_extension():
     temp.chmod(0o600)
     temp.replace(token_file)
     token_file.chmod(0o600)
-    return jsonify(token=token, message="Browser paired. You can now import your YouTube cookies.")
+    return jsonify(token=token, message="Browser extension paired. Keep this token private.")
 
 
-@pairing_bp.post("/api/browser/import-cookies")
-def import_youtube_cookies():
+@pairing_bp.post("/api/browser/submit")
+def submit_active_video():
     supplied = request.headers.get("Authorization", "")
     if not supplied.startswith("Bearer "):
         abort(401)
@@ -77,36 +79,31 @@ def import_youtube_cookies():
         abort(401)
 
     data = request.get_json(silent=True) or {}
-    cookie_text = data.get("cookies")
-    if not isinstance(cookie_text, str) or len(cookie_text.encode("utf-8")) > 1024 * 1024:
-        return jsonify(error="Cookie data is missing or exceeds the 1 MB limit."), 400
+    video_url = str(data.get("url", "")).strip()
+    if not current_app.config["CLIPPER_VALID_YOUTUBE_URL"](video_url):
+        return jsonify(error="The active tab is not a supported HTTPS YouTube video URL."), 400
+    try:
+        count = max(1, min(10, int(data.get("count", 3))))
+        clip_seconds = max(20, min(90, int(data.get("clip_seconds", 45))))
+    except (TypeError, ValueError):
+        return jsonify(error="Clip count and length must be numbers."), 400
+    aspect = data.get("aspect", "9:16")
+    if aspect not in ("9:16", "16:9", "1:1"):
+        return jsonify(error="Unsupported aspect ratio."), 400
 
-    lines = cookie_text.splitlines()
-    valid_rows = []
-    for line in lines:
-        if not line or line.startswith("#"):
-            continue
-        fields = line.split("\t")
-        if len(fields) != 7:
-            return jsonify(error="Invalid Netscape cookie data."), 400
-        domain, include_subdomains, path, secure, expiry, name, value = fields
-        clean_domain = domain.removeprefix("#HttpOnly_").lstrip(".").lower()
-        if clean_domain != "youtube.com" and not clean_domain.endswith(".youtube.com"):
-            return jsonify(error="Only cookies scoped to youtube.com are accepted."), 400
-        if any("\n" in field or "\r" in field for field in fields):
-            return jsonify(error="Invalid cookie field."), 400
-        valid_rows.append(line)
-
-    if not valid_rows:
-        return jsonify(error="No YouTube login cookies were found. Sign in to YouTube in Edge and try again."), 400
-
-    cookie_file = Path(current_app.config["CLIPPER_COOKIE_FILE"])
-    cookie_file.parent.mkdir(parents=True, exist_ok=True)
-    content = "# Netscape HTTP Cookie File\n" + "\n".join(valid_rows) + "\n"
-    temp = cookie_file.with_name(".youtube-cookies-" + secrets.token_hex(8))
-    temp.write_text(content, encoding="utf-8")
-    temp.chmod(0o600)
-    temp.replace(cookie_file)
-    cookie_file.chmod(0o600)
-    return jsonify(message="YouTube cookies imported and stored privately on the Clipper server.",
-                   cookie_count=len(valid_rows))
+    job_id = uuid.uuid4().hex
+    record = {"id": job_id, "status": "queued", "progress": 0,
+              "message": "Queued from your browser…", "created": int(time.time()), "clips": []}
+    jobs = current_app.config["CLIPPER_JOBS"]
+    jobs_lock = current_app.config["CLIPPER_JOBS_LOCK"]
+    jobs_dir = Path(current_app.config["CLIPPER_JOBS_DIR"])
+    with jobs_lock:
+        jobs[job_id] = record
+        (jobs_dir / f"{job_id}.json").write_text(json.dumps(record, indent=2))
+    worker = threading.Thread(
+        target=current_app.config["CLIPPER_PROCESS_VIDEO"],
+        args=(job_id, video_url, count, clip_seconds, aspect),
+        daemon=True,
+    )
+    worker.start()
+    return jsonify(id=job_id, message="Video sent to Clipper."), 202
