@@ -1,17 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "YouTube Clipper Connector",
-  "version": "1.0.0",
-  "description": "Send the active YouTube video to your private YouTube Clipper.",
+  "name": "YouTube Clipper Cookie Connector",
+  "version": "1.1.0",
+  "description": "Import your own signed-in YouTube cookies into your private Clipper server.",
   "permissions": [
-    "activeTab",
+    "cookies",
     "storage"
   ],
   "action": {
-    "default_title": "Send YouTube video to Clipper",
+    "default_title": "Import YouTube login to Clipper",
     "default_popup": "popup.html"
   },
   "optional_host_permissions": [
+    "https://*.youtube.com/*",
+    "https://youtube.com/*",
     "https://*/*"
   ]
 }
