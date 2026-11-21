@@ -119,7 +119,7 @@ Export cookies from your own browser session in Netscape format, then upload the
 
 ## Desktop browser connector (Edge / Chrome)
 
-The optional companion extension lets you open a YouTube video in your normal signed-in browser and explicitly send its URL to the private Clipper. It does **not** embed YouTube or automate sign-in: YouTube blocks or limits many embedded browsing/login flows, and an iframe cannot safely share the browser's authenticated session with the Flask app.
+The optional companion extension lets you explicitly send the active YouTube video URL to the private Clipper. It does **not** collect browser cookies or automate sign-in. For authenticated yt-dlp downloads, export your own YouTube cookies locally in Netscape format and upload them through the private cookie upload control in the Clipper dashboard.
 
 ### Install the extension in Microsoft Edge
 
