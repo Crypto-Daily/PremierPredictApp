@@ -9,12 +9,15 @@
 <label>Aspect ratio<select id="aspect"><option value="9:16">9:16 — Shorts / Reels</option><option value="16:9">16:9 — Landscape</option><option value="1:1">1:1 — Square</option></select></label></div>
 <button id="start" type="submit">Find highlights and create clips</button></form>
 <div id="job" class="job hidden"><div class="progress"><span id="bar"></span></div><p id="status">Waiting…</p></div></section>
-<section class="panel"><h2>Connect your desktop browser</h2>
-<p class="muted">Install the companion extension from the browser-extension folder on your PC. Generate a one-time pairing code here, then enter it in the extension. The extension sends only the active YouTube video URL when you explicitly click Send; it does not read or transmit cookies or page contents.</p>
+<section class="panel"><h2>YouTube login cookies</h2>
+<p class="muted">If YouTube asks yt-dlp to sign in, export your own YouTube cookies from your desktop browser in Netscape format, then upload the .txt file below. The Clipper stores it privately and automatically uses it for video information and downloads. You only need to import the cookies once, then paste video links here; you do not need to watch the full video.</p>
+<form id="cookie-form"><input type="file" id="cookies" accept=".txt,.cookies" required><button class="secondary" type="submit">Save cookies privately</button></form><p id="cookie-status" class="muted"></p>
+</section>
+<section class="panel"><h2>Optional desktop browser connector</h2>
+<p class="muted">The companion extension can send the active video's URL to Clipper. It does not read or transfer browser cookies. For authenticated downloads, use the private cookie upload above.</p>
 <button id="pair-browser" class="secondary" type="button">Generate one-time pairing code</button>
 <p id="pair-code" class="muted" aria-live="polite"></p>
 </section>
-<section class="panel"><h2>YouTube cookies (only if YouTube asks you to sign in)</h2><p class="muted">Upload your own exported Netscape-format cookies file. It is stored outside the public web folder with private file permissions and is never included in Git.</p><form id="cookie-form"><input type="file" id="cookies" accept=".txt,.cookies" required><button class="secondary" type="submit">Save cookies privately</button></form><p id="cookie-status" class="muted"></p></section>
 <section class="panel"><h2>Created clips</h2><div id="results" class="results"><p class="muted">Your finished clips will appear here.</p></div></section>
-<p class="muted footnote">Highlight selection is transcript-based and heuristic. Always review clips and confirm you have permission to use the source video.</p>
+<p class="muted footnote">Only process videos you own or have permission to download and edit. Cookie authentication does not bypass YouTube access restrictions.</p>
 </main><script src="/static/app.js" defer></script></body></html>
