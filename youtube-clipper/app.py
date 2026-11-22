@@ -140,7 +140,7 @@ def process_video(job_id: str, video_url: str, count: int, clip_seconds: int, as
             raise ValueError(f"Video duration must be between 1 second and {MAX_VIDEO_SECONDS // 3600} hours.")
         title = re.sub(r"[^a-zA-Z0-9_-]+", "_", info.get("title") or "video")[:70].strip("_") or "video"
         source = work / "source.%(ext)s"
-        opts = {"format": "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", "outtmpl": str(source),
+        opts = {"format": "bestvideo*+bestaudio/best", "outtmpl": str(source),
                 "merge_output_format": "mp4", "quiet": True, "no_warnings": True, "noplaylist": True}
         if COOKIE_FILE.exists():
             opts["cookiefile"] = str(COOKIE_FILE)
