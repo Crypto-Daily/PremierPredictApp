@@ -22,8 +22,11 @@ app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   MAX_CONTENT_LENGTH=MAX_UPLOAD)
 CHUNK, MAX_CLIPS, CLIP_SECONDS = 8 * 1024**2, 10, 90
 MAX_DURATION = int(os.environ.get("MAX_VIDEO_SECONDS", "10800"))
-BRIDGE = os.environ.get("WHATSAPP_BRIDGE_URL", "http://127.0.0.1:3000").rstrip("/")
-CHAT_ID, MODEL_NAME = os.environ.get("WHATSAPP_CHAT_ID", "").strip(), os.environ.get("WHISPER_MODEL", "base")
+BRIDGE = os.environ.get("WHATSAPP_BRIDGE_URL", "http://127.0.0.1:8766").rstrip("/")
+PHONE_NUMBER = re.sub(r"\\D", "", os.environ.get("WHATSAPP_PHONE_NUMBER", ""))
+CHAT_ID = os.environ.get("WHATSAPP_CHAT_ID", "").strip() or (f"{PHONE_NUMBER}@s.whatsapp.net" if PHONE_NUMBER else "")
+MODEL_NAME = os.environ.get("WHISPER_MODEL", "base")
+whatsapp_process = None
 jobs, upload_locks = {}, {}
 lock, model_lock = threading.RLock(), threading.Lock()
 whisper_model = None
@@ -213,6 +216,21 @@ def health():
     return jsonify(status="ok",app="private-video-highlights",
                    whatsapp_configured=bool(CHAT_ID))
 
+@app.get("/api/whatsapp/status")
+def whatsapp_status():
+    require_login()
+    try:
+        response = requests.get(f"{BRIDGE}/status", timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        data["recipient_configured"] = bool(CHAT_ID)
+        return jsonify(data)
+    except Exception as exc:
+        log.warning("WhatsApp status unavailable: %s", exc)
+        return jsonify(connected=False, qr_data_url=None,
+                       recipient_configured=bool(CHAT_ID),
+                       error="WhatsApp session is starting. Refresh in a moment."), 503
+
 @app.post("/api/upload/init")
 def init_upload():
     require_login()
@@ -322,6 +340,24 @@ def list_jobs():
     with lock:
         return jsonify(jobs=[{k:v for k,v in item.items() if k not in {"sent_indices","source_path"}} for item in jobs.values()])
 
+def run_whatsapp_bridge():
+    global whatsapp_process
+    node = shutil.which("node")
+    if not node:
+        raise SystemExit("Node.js is required for the dedicated WhatsApp session.")
+    env = os.environ.copy()
+    env.setdefault("WHATSAPP_AUTH_DIR", str(DATA / "whatsapp-auth"))
+    whatsapp_process = subprocess.Popen([node, str(BASE / "whatsapp.js")],
+        cwd=str(BASE), env=env, stdin=subprocess.DEVNULL)
+    def watch():
+        while True:
+            code = whatsapp_process.poll()
+            if code is not None:
+                log.error("Dedicated WhatsApp session exited (%s); restarting app under PM2.", code)
+                os._exit(1)
+            time.sleep(5)
+    threading.Thread(target=watch, name="whatsapp-watch", daemon=True).start()
+
 def run_cloudflare_tunnel():
     binary=shutil.which("cloudflared")
     if not binary: raise SystemExit("cloudflared is not installed or missing from PATH.")
@@ -338,5 +374,6 @@ def run_cloudflare_tunnel():
 
 if __name__=="__main__":
     if not PASSWORD and not PASSWORD_HASH: raise SystemExit("Set APP_PASSWORD or APP_PASSWORD_HASH before starting.")
+    run_whatsapp_bridge()
     run_cloudflare_tunnel()
     app.run(host="127.0.0.1",port=int(os.environ.get("PORT","8765")),debug=False,use_reloader=False,threaded=True)
