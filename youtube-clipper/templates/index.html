@@ -3,36 +3,13 @@
 <body><header><h1>Video clips</h1><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary" type="submit">Sign out</button></form></header>
 <main>
 <section class="panel"><h2>Create clips</h2><form id="clip-form">
-<label>YouTube video URL (optional)<input id="url" type="url" placeholder="Paste a YouTube URL if you want to use a link"></label>
-<label>Or upload your own video file<input id="source-video" type="file" accept="video/mp4,video/quicktime,video/x-m4v,video/x-matroska,video/webm,.mp4,.mov,.m4v,.mkv,.webm"></label>
-<p class="muted">Upload a video you own or have permission to edit. Supported: MP4, MOV, M4V, MKV and WebM. Large uploads may take time.</p>
+<label>Upload your long video<input id="source-video" type="file" accept="video/mp4,video/quicktime,video/x-m4v,video/x-matroska,video/webm,.mp4,.mov,.m4v,.mkv,.webm" required></label>
+<p class="muted">Supported formats: MP4, MOV, M4V, MKV and WebM. Upload a video you own or have permission to edit.</p>
 <div class="grid"><label>Number of clips<select id="count"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option></select></label>
 <label>Clip length<select id="length"><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45" selected>45 seconds</option><option value="60">60 seconds</option><option value="90">90 seconds</option></select></label>
 <label>Aspect ratio<select id="aspect"><option value="9:16">9:16 — Shorts / Reels</option><option value="16:9">16:9 — Landscape</option><option value="1:1">1:1 — Square</option></select></label></div>
 <button id="start" type="submit">Find highlights and create clips</button></form>
 <div id="job" class="job hidden"><div class="progress"><span id="bar"></span></div><p id="status">Waiting…</p></div></section>
-<section class="panel"><h2>YouTube login — import from this phone</h2>
-<p class="muted">Signing in to YouTube on your phone does not automatically sign yt-dlp in on the server. Export a Netscape cookies.txt file from the same mobile browser, then select that file here. The Clipper saves it privately and uses it for video information and downloads.</p>
-<h3>Android steps (Firefox)</h3>
-<ol>
-<li>Install <a href="https://www.mozilla.org/firefox/browsers/mobile/android/" target="_blank" rel="noopener">Firefox for Android</a> and sign in to YouTube in Firefox.</li>
-<li>In Firefox, open the <a href="https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/" target="_blank" rel="noopener">cookies.txt add-on page</a> and add the extension.</li>
-<li>While signed in, open youtube.com in that same Firefox browser. Use the add-on to export cookies in Netscape format and save the downloaded <code>cookies.txt</code> file to your phone.</li>
-<li>Return to this Clipper page in Firefox, tap Choose File below, select the downloaded <code>cookies.txt</code>, and tap Save cookies privately.</li>
-</ol>
-<p class="muted">The add-on needs browser cookie access to export your session. Export only your own account, keep the file private, and delete the downloaded copy from your phone after a successful upload. Never send the file to anyone or paste its contents into chat. If you prefer not to grant an extension cookie access, use a desktop export instead.</p>
-<form id="cookie-form"><label for="cookies">Netscape cookies file (.txt)</label><input type="file" id="cookies" accept=".txt,.cookies,text/plain" required><button class="secondary" type="submit">Save cookies privately</button></form><p id="cookie-status" class="muted" aria-live="polite"></p>
-</section>
-<section class="panel"><h2>Optional desktop browser connector</h2>
-<p class="muted">The companion extension can send the active video's URL to Clipper. It does not read or transfer browser cookies. For authenticated downloads, use the private cookie upload above.</p>
-<button id="pair-browser" class="secondary" type="button">Generate one-time pairing code</button>
-<p id="pair-code" class="muted" aria-live="polite"></p>
-</section>
-<section class="panel"><h2>YouTube publishing</h2>
-<p class="muted">Connect your channel once. Then schedule any finished clip; YouTube will publish it at the selected time even when this server is not being actively used.</p>
-<a class="connect-link" href="/youtube/connect">Connect YouTube channel</a>
-<p class="muted">Requires Google OAuth credentials to be configured on the server first.</p>
-</section>
-<section class="panel"><h2>Created clips</h2><div id="results" class="results"><p class="muted">Your finished clips will appear here.</p></div></section>
-<p class="muted footnote">Only process videos you own or have permission to download and edit. Cookie authentication does not bypass YouTube access restrictions.</p>
+<section class="panel"><h2>Your generated clips</h2><p class="muted">Download the videos you want to keep. When finished, press Done &amp; Delete to remove this job from the server.</p><div id="results" class="results"><p class="muted">Your finished clips will appear here.</p></div></section>
+<p class="muted footnote">Only upload videos you own or have permission to edit. Your uploaded source and temporary processing files are removed when processing finishes; use Done &amp; Delete to remove the generated clips and job records too.</p>
 </main><script src="/static/app.js" defer></script></body></html>
