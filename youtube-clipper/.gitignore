@@ -6,3 +6,4 @@ venv/
 data/
 cookies.txt
 *.log
+node_modules/
