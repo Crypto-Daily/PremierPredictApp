@@ -404,7 +404,7 @@ def delete_job(job_id):
             manifest = {}
         for clip in manifest.get("clips", record.get("clips", [])):
             filename = clip.get("file", "")
-            if re.fullmatch(r"[a-f0-9]{32}_[0-9]{2}\\.mp4", filename) and filename.startswith(job_id + "_"):
+            if re.fullmatch(r"[a-f0-9]{32}_[0-9]{2}\.mp4", filename) and filename.startswith(job_id + "_"):
                 (OUTPUTS / filename).unlink(missing_ok=True)
         manifest_path.unlink(missing_ok=True)
         record_path.unlink(missing_ok=True)
