@@ -75,6 +75,29 @@ $("cookie-form").addEventListener("submit", async (event) => {
     $("cookies").value = "";
   } catch (error) { $("cookie-status").textContent = error.message; }
 });
+async function pollPublish(id, status, button) {
+  try {
+    const response = await fetch("/api/jobs/"+id);
+    const job = await response.json();
+    if (!response.ok) throw new Error(job.error || "Could not check upload status.");
+    status.textContent = job.message || job.status;
+    if (job.status === "published") {
+      const url = job.youtube?.url || "#";
+      status.innerHTML = 'Scheduled successfully: <a target="_blank" rel="noopener" href="'+url+'">View on YouTube</a>';
+      button.textContent = "Scheduled";
+      return;
+    }
+    if (job.status === "failed") {
+      button.disabled = false;
+      return;
+    }
+    setTimeout(() => pollPublish(id, status, button), 3000);
+  } catch (error) {
+    status.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
 $("results").addEventListener("click", async (event) => {
   const button = event.target.closest(".schedule-button");
   if (!button) return;
@@ -101,8 +124,7 @@ $("results").addEventListener("click", async (event) => {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Could not schedule this clip.");
-    status.innerHTML = 'Scheduled successfully: <a target="_blank" rel="noopener" href="'+data.url+'">View on YouTube</a>';
-    button.textContent = "Scheduled";
+    await pollPublish(data.id, status, button);
   } catch (error) {
     status.textContent = error.message;
     button.disabled = false;
