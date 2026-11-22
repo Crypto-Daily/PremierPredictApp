@@ -102,3 +102,24 @@ async function poll(id){
 function escapeHtml(value){
   return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 }
+
+
+async function refreshWhatsAppStatus(){
+  const status=$("wa-status"), qr=$("wa-qr");
+  try{
+    const response=await fetch("/api/whatsapp/status");
+    const data=await response.json();
+    if(data.connected){
+      status.textContent="✓ WhatsApp is connected"+(data.user ? " as "+(data.user.name || data.user.id || "your linked account") : "")+".";
+      qr.classList.add("hidden");
+    }else if(data.qr_data_url){
+      status.textContent="Scan this QR code with the WhatsApp account dedicated to the Clipper.";
+      qr.src=data.qr_data_url;qr.classList.remove("hidden");
+    }else{
+      status.textContent=data.error || (data.recipient_configured ? "Waiting for WhatsApp QR code…" : "Set WHATSAPP_PHONE_NUMBER on the server, then restart the existing Clipper process.");
+      qr.classList.add("hidden");
+    }
+  }catch(error){status.textContent="WhatsApp session is starting. This page will check again shortly.";}
+  setTimeout(refreshWhatsAppStatus,5000);
+}
+refreshWhatsAppStatus();
