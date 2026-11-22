@@ -17,6 +17,7 @@ import whisper
 import yt_dlp
 from flask import Flask, abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from werkzeug.security import check_password_hash
+from youtube_publisher import make_flow, save_credentials, upload_scheduled_video
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("youtube_clipper")
@@ -339,6 +340,54 @@ def create_job():
         (JOBS / f"{job_id}.json").write_text(json.dumps(record, indent=2))
     threading.Thread(target=process_video, args=(job_id, video_url, count, clip_seconds, aspect), daemon=True).start()
     return jsonify(id=job_id), 202
+
+
+@app.get("/youtube/connect")
+def youtube_connect():
+    require_login()
+    flow = make_flow()
+    authorization_url, state = flow.authorization_url(
+        access_type="offline", include_granted_scopes="true", prompt="consent"
+    )
+    session["youtube_oauth_state"] = state
+    return redirect(authorization_url)
+
+
+@app.get("/oauth/youtube/callback")
+def youtube_callback():
+    require_login()
+    state = session.pop("youtube_oauth_state", None)
+    if not state or request.args.get("state") != state:
+        abort(400, "Invalid YouTube authorization state.")
+    flow = make_flow(state=state)
+    flow.fetch_token(authorization_response=request.url)
+    save_credentials(DATA, flow.credentials)
+    return redirect(url_for("index") + "?youtube=connected")
+
+
+@app.post("/api/publish")
+def publish_clip():
+    require_login()
+    if request.headers.get("X-CSRF-Token") != session.get("csrf"):
+        abort(403)
+    data = request.get_json(silent=True) or {}
+    filename = str(data.get("file", ""))
+    if not (len(filename) == 39 and filename[:32].isalnum() and filename[32] == "_" and filename[33:35].isdigit() and filename[35:] == ".mp4"):
+        return jsonify(error="Invalid clip file."), 400
+    clip_path = OUTPUTS / filename
+    if not clip_path.is_file():
+        abort(404)
+    title = str(data.get("title", "")).strip()
+    description = str(data.get("description", "")).strip()
+    if not title:
+        return jsonify(error="Enter a YouTube title before scheduling."), 400
+    try:
+        publish_at = datetime.fromisoformat(str(data.get("publish_at", "")).replace("Z", "+00:00"))
+        result = upload_scheduled_video(DATA, clip_path, title, description, publish_at)
+        return jsonify(result), 201
+    except Exception as exc:
+        logger.exception("YouTube scheduled upload failed for %s", filename)
+        return jsonify(error=str(exc)[:500]), 400
 
 
 @app.post("/api/upload")
