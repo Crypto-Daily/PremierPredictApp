@@ -4,13 +4,11 @@ A standalone, single-user web app kept in its own folder. It does not import or 
 
 ## What it does
 
-- Accepts a YouTube video URL.
-- Downloads the source with yt-dlp.
+- Accepts a video file upload (MP4, MOV, M4V, MKV, or WebM).
 - Transcribes speech locally with Whisper.
 - Ranks transcript sections with simple highlight heuristics (not an LLM).
 - Cuts MP4 clips with FFmpeg in 9:16, 16:9, or 1:1.
 - Offers downloads in the browser.
-- Supports an optional user-supplied Netscape cookies file for videos where YouTube requires the account owner to authenticate.
 
 Only process videos you own or have permission to download and edit. YouTube access restrictions still apply; cookie support does not bypass them.
 
@@ -138,3 +136,15 @@ The Clipper can upload a generated MP4 directly to the YouTube channel you autho
 The app requests the `youtube.upload` OAuth scope only. OAuth tokens are stored in the private data directory with file mode 0600. Never commit OAuth client JSON or token files.
 
 YouTube scheduled publication requires the video to remain private and not have been previously published. Google API quota and OAuth verification/testing restrictions may apply. See the official [YouTube upload guide](https://developers.google.com/youtube/data/guides/uploading_a_video) and [video resource status documentation](https://developers.google.com/youtube/data/reference/rest/v3/videos).
+
+
+## Simple upload, clip, download, delete workflow
+
+1. Upload a long video you own or have permission to edit.
+2. Wait for Whisper transcription and highlight rendering to finish.
+3. Download the generated MP4 clips you want to keep.
+4. Press **Done & Delete this job**. The app deletes this job's generated clips, manifest, job record, temporary processing folder, and any remaining incoming upload file. Other jobs and their clips are not touched.
+
+The uploaded source is removed from the temporary processing folder when processing ends. The generated clips remain available until you download them and explicitly delete the job. No Google account, YouTube OAuth, or automatic publishing is required.
+
+The server enforces a maximum upload size using `MAX_UPLOAD_BYTES` (default 4 GiB). If the app is behind a reverse proxy or tunnel with a lower request-body limit, that limit must also be considered for large uploads.
