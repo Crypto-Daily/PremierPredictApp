@@ -10,7 +10,7 @@ A standalone, single-user web app kept in its own folder. It does not import or 
 - Cuts MP4 clips with FFmpeg in 9:16, 16:9, or 1:1.
 - Offers downloads in the browser.
 
-Only process videos you own or have permission to download and edit. YouTube access restrictions still apply; cookie support does not bypass them.
+Only process videos you own or have permission to download and edit. 
 
 ## Requirements
 
@@ -66,7 +66,7 @@ cd /opt/youtube-clipper
 python app.py
 ```
 
-The app binds to 127.0.0.1:8765. The deployed PM2 entry starts the Flask app and its supervised Cloudflare Quick Tunnel together. Keep the dashboard behind HTTPS and use a strong password.
+The app binds to 127.0.0.1:8765. The deployed PM2 entry starts the Flask app and its supervised Cloudflare Quick Tunnel together. Video files are sent in 8 MiB chunks so large uploads do not need one enormous HTTP request. Keep the dashboard behind HTTPS and use a strong password.
 
 ## Cookies — Android or desktop
 
