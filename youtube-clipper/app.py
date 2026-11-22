@@ -79,10 +79,11 @@ def run_command(args: list[str]):
 
 def extract_youtube_info(video_url: str):
     """Try YouTube player clients that can expose downloadable formats without a PO token."""
+    # The current yt-dlp guidance recommends mweb with a PO-token provider.
+    # The bgutil plugin supplies fresh, video-bound tokens automatically.
     attempts = [
-        ("default", None),
-        ("android_vr", {"youtube": {"player_client": ["android_vr"]}}),
-        ("web_embedded", {"youtube": {"player_client": ["web_embedded"]}}),
+        ("mweb_with_po_token", {"youtube": {"player_client": ["mweb", "web_safari"]}}),
+        ("android_vr_fallback", {"youtube": {"player_client": ["android_vr"]}}),
     ]
     failures = []
     for client_name, extractor_args in attempts:
@@ -107,9 +108,9 @@ def extract_youtube_info(video_url: str):
             failures.append(f"{client_name}: {str(exc)[:240]}")
             logger.warning("YouTube extraction attempt failed for client %s: %s", client_name, str(exc)[:240])
     raise RuntimeError(
-        "YouTube did not provide downloadable formats to yt-dlp after trying its default, "
-        "Android VR, and embedded-player clients. This can happen when YouTube requires "
-        "a current PO Token or restricts this video. Details: " + " | ".join(failures)
+        "YouTube did not provide downloadable formats. The mweb attempt requires the "
+        "BgUtils PO-token plugin and its local token generator; verify both are installed "
+        "and available to this Python environment. Details: " + " | ".join(failures)
     )
 
 
