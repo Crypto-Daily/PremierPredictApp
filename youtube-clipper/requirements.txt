@@ -1,6 +1,4 @@
 Flask>=3.0,<4
 Werkzeug>=3.0
-yt-dlp[default]>=2025.1.0
 openai-whisper>=20231117
-bgutil-ytdlp-pot-provider>=2.0.2
-
+requests>=2.31
