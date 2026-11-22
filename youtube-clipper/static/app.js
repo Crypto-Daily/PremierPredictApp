@@ -1,136 +1,104 @@
 const $ = (id) => document.getElementById(id);
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
 let pollTimer = null;
+let activeUploadId = null;
 
 $("clip-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const sourceFile = $("source-video").files[0];
-  if (!sourceFile) {
-    $("status").textContent = "Choose a video file first.";
-    return;
-  }
+  const file = $("source-video").files[0];
+  if (!file) { $("status").textContent = "Choose a video first."; return; }
   $("start").disabled = true;
   $("job").classList.remove("hidden");
-  $("status").textContent = "Uploading your video…";
-  $("bar").style.width = "2%";
   $("results").innerHTML = "";
-  let activeUploadId = null;
+  $("bar").style.width = "1%";
+  $("status").textContent = "Preparing secure upload…";
+  const chunkSize = 8 * 1024 * 1024;
+  const total = Math.ceil(file.size / chunkSize);
   try {
-    const chunkSize = 8 * 1024 * 1024;
-    const totalChunks = Math.ceil(sourceFile.size / chunkSize);
     const initResponse = await fetch("/api/upload/init", {
       method: "POST",
       headers: {"Content-Type":"application/json","X-CSRF-Token":csrfToken},
-      body: JSON.stringify({
-        filename: sourceFile.name, size: sourceFile.size, chunks: totalChunks,
-        count: $("count").value, clip_seconds: $("length").value, aspect: $("aspect").value
-      })
+      body: JSON.stringify({filename:file.name,size:file.size,chunks:total,count:$("count").value})
     });
     const init = await initResponse.json();
     if (!initResponse.ok) throw new Error(init.error || "Could not start upload.");
     activeUploadId = init.upload_id;
-    for (let index = 0; index < totalChunks; index++) {
-      const chunk = sourceFile.slice(index * chunkSize, Math.min(sourceFile.size, (index + 1) * chunkSize));
-      let uploaded = false;
-      let lastError = "Upload chunk failed.";
-      for (let attempt = 0; attempt < 3 && !uploaded; attempt++) {
-        try {
-          const chunkResponse = await fetch("/api/upload/" + init.upload_id + "/chunk/" + index, {
-            method: "PUT",
-            headers: {"X-CSRF-Token":csrfToken,"Content-Type":"application/octet-stream"},
-            body: chunk
+    for (let i=0;i<total;i++) {
+      const part=file.slice(i*chunkSize,Math.min(file.size,(i+1)*chunkSize));
+      let success=false, lastError="Chunk upload failed.";
+      for(let attempt=0;attempt<3 && !success;attempt++){
+        try{
+          const response=await fetch("/api/upload/"+init.upload_id+"/chunk/"+i,{
+            method:"PUT",headers:{"X-CSRF-Token":csrfToken,"Content-Type":"application/octet-stream"},body:part
           });
-          const chunkData = await chunkResponse.json();
-          if (!chunkResponse.ok) throw new Error(chunkData.error || lastError);
-          uploaded = true;
-        } catch (error) {
-          lastError = error.message;
-        }
+          const data=await response.json();
+          if(!response.ok) throw new Error(data.error || lastError);
+          success=true;
+        }catch(error){lastError=error.message;}
       }
-      if (!uploaded) throw new Error("Upload stopped at part " + (index + 1) + " of " + totalChunks + ": " + lastError);
-      $("bar").style.width = Math.round(((index + 1) / totalChunks) * 15) + "%";
-      $("status").textContent = "Uploading video: " + (index + 1) + " of " + totalChunks + " parts…";
+      if(!success) throw new Error("Upload stopped at part "+(i+1)+"/"+total+": "+lastError);
+      $("bar").style.width=Math.round(((i+1)/total)*15)+"%";
+      $("status").textContent="Uploading video: "+(i+1)+" of "+total+" parts…";
     }
-    const completeResponse = await fetch("/api/upload/" + init.upload_id + "/complete", {
-      method: "POST",
-      headers: {"X-CSRF-Token":csrfToken}
+    const done=await fetch("/api/upload/"+init.upload_id+"/complete",{
+      method:"POST",headers:{"X-CSRF-Token":csrfToken}
     });
-    const data = await completeResponse.json();
-    if (!completeResponse.ok) throw new Error(data.error || "Could not finish upload.");
-    activeUploadId = null;
-    poll(data.id);
-  } catch (error) {
-    if (activeUploadId) {
-      try { await fetch("/api/upload/" + activeUploadId + "/abort", {method:"POST",headers:{"X-CSRF-Token":csrfToken}}); } catch {}
+    const result=await done.json();
+    if(!done.ok) throw new Error(result.error || "Upload could not be completed.");
+    activeUploadId=null;
+    poll(result.id);
+  }catch(error){
+    if(activeUploadId){
+      try{await fetch("/api/upload/"+activeUploadId+"/abort",{method:"POST",headers:{"X-CSRF-Token":csrfToken}});}catch{}
+      activeUploadId=null;
     }
-    $("status").textContent = error.message;
-    $("start").disabled = false;
+    $("status").textContent=error.message;
+    $("start").disabled=false;
   }
 });
 
-async function poll(id) {
+async function poll(id){
   clearTimeout(pollTimer);
-  try {
-    const response = await fetch("/api/jobs/" + id);
-    const job = await response.json();
-    if (!response.ok) throw new Error(job.error || "Could not check job.");
-    $("status").textContent = job.message || job.status;
-    $("bar").style.width = (job.progress || 0) + "%";
-    if (job.status === "completed") {
-      $("start").disabled = false;
-      $("results").innerHTML = (job.clips || []).map((clip) => {
-        const link = "/clips/" + encodeURIComponent(clip.file);
-        return '<article class="clip"><div><strong>' + escapeHtml(clip.name) +
-          '</strong><p>' + clip.start + 's – ' + clip.end +
-          's</p><p>' + escapeHtml(clip.transcript || "Transcript unavailable") +
-          '</p><a href="' + link + '">Download video</a></div></article>';
-      }).join("") +
-        '<div class="job-cleanup"><p class="muted">Download the clips you want to keep. Then delete this job to free server storage.</p>' +
-        '<button id="done-delete" class="danger" type="button" data-job-id="' + encodeURIComponent(id) +
-        '">Done &amp; Delete this job</button><p id="delete-status" class="muted" aria-live="polite"></p></div>';
+  try{
+    const response=await fetch("/api/jobs/"+encodeURIComponent(id));
+    const job=await response.json();
+    if(!response.ok) throw new Error(job.error || "Could not check processing status.");
+    $("status").textContent=job.message || job.status;
+    $("bar").style.width=(job.progress || 0)+"%";
+    if(job.status==="delivered"){
+      $("bar").style.width="100%";
+      $("start").disabled=false;
+      $("results").innerHTML='<p class="success">✓ '+escapeHtml(job.message)+'</p><p class="muted">You can upload another video. No video files remain in this job on the server.</p>';
+      $("source-video").value="";
       return;
     }
-    if (job.status === "failed") {
-      $("start").disabled = false;
-      $("results").innerHTML = '<p class="error">' + escapeHtml(job.message) + '</p>' +
-        '<button id="done-delete" class="danger" type="button" data-job-id="' + encodeURIComponent(id) +
-        '">Delete failed job</button><p id="delete-status" class="muted" aria-live="polite"></p>';
+    if(job.status==="delivery_failed"){
+      $("start").disabled=false;
+      $("results").innerHTML='<p class="error">'+escapeHtml(job.message)+'</p><button id="retry-delivery" type="button">Retry WhatsApp delivery</button><p id="retry-status" class="muted" aria-live="polite"></p>';
+      $("retry-delivery").addEventListener("click",async()=>{
+        const button=$("retry-delivery");button.disabled=true;
+        $("retry-status").textContent="Retrying unsent clips…";
+        try{
+          const retry=await fetch("/api/jobs/"+encodeURIComponent(id)+"/retry",{method:"POST",headers:{"X-CSRF-Token":csrfToken}});
+          const data=await retry.json();
+          if(!retry.ok) throw new Error(data.error || "Retry failed.");
+          poll(id);
+        }catch(error){$("retry-status").textContent=error.message;button.disabled=false;}
+      });
       return;
     }
-    pollTimer = setTimeout(() => poll(id), 2500);
-  } catch (error) {
-    $("status").textContent = error.message;
-    $("start").disabled = false;
+    if(job.status==="failed"){
+      $("start").disabled=false;
+      $("results").innerHTML='<p class="error">'+escapeHtml(job.message)+'</p><p class="muted">The source file has been kept on the server. Fix the issue and upload again.</p>';
+      return;
+    }
+    pollTimer=setTimeout(()=>poll(id),2500);
+  }catch(error){
+    $("status").textContent=error.message;
+    $("start").disabled=false;
   }
 }
 
-$("results").addEventListener("click", async (event) => {
-  const button = event.target.closest("#done-delete");
-  if (!button) return;
-  const jobId = button.dataset.jobId;
-  if (!confirm("Delete this job and all its generated clips from the server? Download anything you want to keep first.")) return;
-  button.disabled = true;
-  const status = $("delete-status");
-  status.textContent = "Deleting uploaded video, clips and temporary files…";
-  try {
-    const response = await fetch("/api/jobs/" + encodeURIComponent(jobId) + "/delete", {
-      method: "POST",
-      headers: {"X-CSRF-Token": csrfToken}
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Could not delete this job.");
-    $("results").innerHTML = '<p class="muted">Job deleted. Server storage has been cleared.</p>';
-    $("job").classList.add("hidden");
-    $("source-video").value = "";
-    $("clip-form").reset();
-  } catch (error) {
-    status.textContent = error.message;
-    button.disabled = false;
-  }
-});
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[char]));
+function escapeHtml(value){
+  return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 }
