@@ -16,14 +16,14 @@ for folder in (JOBS, INCOMING):
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 PASSWORD_HASH, PASSWORD = os.environ.get("APP_PASSWORD_HASH", ""), os.environ.get("APP_PASSWORD", "")
-MAX_UPLOAD = int(os.environ.get("MAX_UPLOAD_BYTES", str(2 * 1024**3)))
+MAX_UPLOAD = int(os.environ.get("MAX_UPLOAD_BYTES", str(1024**3)))
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "1") == "1",
                   MAX_CONTENT_LENGTH=MAX_UPLOAD)
 CHUNK, MAX_CLIPS, CLIP_SECONDS = 8 * 1024**2, 10, 90
 MAX_DURATION = int(os.environ.get("MAX_VIDEO_SECONDS", "10800"))
 BRIDGE = os.environ.get("WHATSAPP_BRIDGE_URL", "http://127.0.0.1:8766").rstrip("/")
-PHONE_NUMBER = re.sub(r"\\D", "", os.environ.get("WHATSAPP_PHONE_NUMBER", ""))
+PHONE_NUMBER = re.sub(r"\D", "", os.environ.get("WHATSAPP_PHONE_NUMBER", ""))
 CHAT_ID = os.environ.get("WHATSAPP_CHAT_ID", "").strip() or (f"{PHONE_NUMBER}@s.whatsapp.net" if PHONE_NUMBER else "")
 MODEL_NAME = os.environ.get("WHISPER_MODEL", "base")
 whatsapp_process = None
@@ -98,7 +98,7 @@ def choose_highlights(segments, duration, requested):
     return sorted(chosen,key=lambda x:x["start"])
 
 def send_clip(path, caption):
-    if not CHAT_ID: raise RuntimeError("Set WHATSAPP_CHAT_ID in the app environment before processing.")
+    if not CHAT_ID: raise RuntimeError("Set WHATSAPP_PHONE_NUMBER in the app environment before processing.")
     if not path.is_file(): raise FileNotFoundError(f"Missing clip: {path.name}")
     payload={"chatId":CHAT_ID,"filePath":str(path.resolve()),"mediaType":"video",
              "caption":caption[:900],"fileName":path.name}
