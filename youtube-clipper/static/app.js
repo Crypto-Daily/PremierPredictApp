@@ -46,7 +46,7 @@ async function poll(id) {
       $("start").disabled = false;
       $("results").innerHTML = (job.clips || []).map((clip, index) => {
         const link = "/clips/"+encodeURIComponent(clip.file);
-        return '<article class="clip clip-publish"><div class="clip-info"><strong>'+escapeHtml(clip.name)+'</strong><p>'+clip.start+'s – '+clip.end+'s</p><p>'+escapeHtml(clip.transcript || "Transcript unavailable")+'</p><a href="'+link+'">Download MP4</a></div><div class="publish-fields"><label>YouTube title<input class="pub-title" maxlength="100" value="'+escapeHtml(clip.name.replace(/\\.mp4$/i,""))+'"></label><label>Description<textarea class="pub-description" rows="2" maxlength="5000"></textarea></label><label>Publish date and time<input class="pub-time" type="datetime-local"></label><button class="schedule-button" type="button" data-file="'+escapeHtml(clip.file)+'">Upload and schedule</button><p class="pub-status muted" aria-live="polite"></p></div></article>';
+        return '<article class="clip clip-publish"><div class="clip-info"><strong>'+escapeHtml(clip.name)+'</strong><p>'+clip.start+'s – '+clip.end+'s</p><p>'+escapeHtml(clip.transcript || "Transcript unavailable")+'</p><a href="'+link+'">Download MP4</a></div><div class="publish-fields"><label>YouTube title<input class="pub-title" maxlength="100" value="'+escapeHtml(clip.name)+'"></label><label>Description<textarea class="pub-description" rows="2" maxlength="5000"></textarea></label><label>Publish date and time<input class="pub-time" type="datetime-local"></label><button class="schedule-button" type="button" data-file="'+escapeHtml(clip.file)+'">Upload and schedule</button><p class="pub-status muted" aria-live="polite"></p></div></article>';
       }).join("");
       return;
     }
