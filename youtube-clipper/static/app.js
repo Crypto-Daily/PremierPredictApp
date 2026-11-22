@@ -10,9 +10,23 @@ $("clip-form").addEventListener("submit", async (event) => {
   $("bar").style.width = "2%";
   $("results").innerHTML = "";
   try {
-    const response = await fetch("/api/jobs", {method:"POST",headers,body:JSON.stringify({
-      url:$("url").value, count:$("count").value, clip_seconds:$("length").value, aspect:$("aspect").value
-    })});
+    const sourceFile = $("source-video").files[0];
+    let response;
+    if (sourceFile) {
+      const form = new FormData();
+      form.append("video", sourceFile);
+      form.append("count", $("count").value);
+      form.append("clip_seconds", $("length").value);
+      form.append("aspect", $("aspect").value);
+      $("status").textContent = "Uploading your video…";
+      response = await fetch("/api/upload", {method:"POST",headers:{"X-CSRF-Token":csrfToken},body:form});
+    } else if ($("url").value.trim()) {
+      response = await fetch("/api/jobs", {method:"POST",headers,body:JSON.stringify({
+        url:$("url").value, count:$("count").value, clip_seconds:$("length").value, aspect:$("aspect").value
+      })});
+    } else {
+      throw new Error("Paste a YouTube URL or choose a video file.");
+    }
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Could not start job.");
     poll(data.id);
