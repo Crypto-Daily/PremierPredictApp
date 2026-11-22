@@ -77,6 +77,42 @@ def run_command(args: list[str]):
     subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 
+def extract_youtube_info(video_url: str):
+    """Try YouTube player clients that can expose downloadable formats without a PO token."""
+    attempts = [
+        ("default", None),
+        ("android_vr", {"youtube": {"player_client": ["android_vr"]}}),
+        ("web_embedded", {"youtube": {"player_client": ["web_embedded"]}}),
+    ]
+    failures = []
+    for client_name, extractor_args in attempts:
+        info_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+            "socket_timeout": 30,
+        }
+        if COOKIE_FILE.exists():
+            info_opts["cookiefile"] = str(COOKIE_FILE)
+        if extractor_args:
+            info_opts["extractor_args"] = extractor_args
+        try:
+            with yt_dlp.YoutubeDL(info_opts) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+            if info and (info.get("formats") or info.get("url")):
+                logger.info("YouTube metadata extracted using player client: %s", client_name)
+                return info, extractor_args
+            failures.append(f"{client_name}: no downloadable formats returned")
+        except Exception as exc:
+            failures.append(f"{client_name}: {str(exc)[:240]}")
+            logger.warning("YouTube extraction attempt failed for client %s: %s", client_name, str(exc)[:240])
+    raise RuntimeError(
+        "YouTube did not provide downloadable formats to yt-dlp after trying its default, "
+        "Android VR, and embedded-player clients. This can happen when YouTube requires "
+        "a current PO Token or restricts this video. Details: " + " | ".join(failures)
+    )
+
+
 def load_model():
     global whisper_model
     with whisper_lock:
@@ -130,11 +166,7 @@ def process_video(job_id: str, video_url: str, count: int, clip_seconds: int, as
     work.mkdir(parents=True, exist_ok=True)
     try:
         update_job(job_id, status="downloading", progress=5, message="Getting video information…")
-        info_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "socket_timeout": 30}
-        if COOKIE_FILE.exists():
-            info_opts["cookiefile"] = str(COOKIE_FILE)
-        with yt_dlp.YoutubeDL(info_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
+        info, selected_extractor_args = extract_youtube_info(video_url)
         duration = float(info.get("duration") or 0)
         if duration <= 0 or duration > MAX_VIDEO_SECONDS:
             raise ValueError(f"Video duration must be between 1 second and {MAX_VIDEO_SECONDS // 3600} hours.")
@@ -144,6 +176,8 @@ def process_video(job_id: str, video_url: str, count: int, clip_seconds: int, as
                 "merge_output_format": "mp4", "quiet": True, "no_warnings": True, "noplaylist": True}
         if COOKIE_FILE.exists():
             opts["cookiefile"] = str(COOKIE_FILE)
+        if selected_extractor_args:
+            opts["extractor_args"] = selected_extractor_args
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([video_url])
         videos = [p for p in work.iterdir() if p.is_file() and p.name.startswith("source.")]
