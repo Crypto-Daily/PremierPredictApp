@@ -9,9 +9,17 @@
 <label>Aspect ratio<select id="aspect"><option value="9:16">9:16 — Shorts / Reels</option><option value="16:9">16:9 — Landscape</option><option value="1:1">1:1 — Square</option></select></label></div>
 <button id="start" type="submit">Find highlights and create clips</button></form>
 <div id="job" class="job hidden"><div class="progress"><span id="bar"></span></div><p id="status">Waiting…</p></div></section>
-<section class="panel"><h2>YouTube login cookies</h2>
-<p class="muted">If YouTube asks yt-dlp to sign in, export your own YouTube cookies from your desktop browser in Netscape format, then upload the .txt file below. The Clipper stores it privately and automatically uses it for video information and downloads. You only need to import the cookies once, then paste video links here; you do not need to watch the full video.</p>
-<form id="cookie-form"><input type="file" id="cookies" accept=".txt,.cookies" required><button class="secondary" type="submit">Save cookies privately</button></form><p id="cookie-status" class="muted"></p>
+<section class="panel"><h2>YouTube login — import from this phone</h2>
+<p class="muted">Signing in to YouTube on your phone does not automatically sign yt-dlp in on the server. Export a Netscape cookies.txt file from the same mobile browser, then select that file here. The Clipper saves it privately and uses it for video information and downloads.</p>
+<h3>Android steps (Firefox)</h3>
+<ol>
+<li>Install <a href="https://www.mozilla.org/firefox/browsers/mobile/android/" target="_blank" rel="noopener">Firefox for Android</a> and sign in to YouTube in Firefox.</li>
+<li>In Firefox, open the <a href="https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/" target="_blank" rel="noopener">cookies.txt add-on page</a> and add the extension.</li>
+<li>While signed in, open youtube.com in that same Firefox browser. Use the add-on to export cookies in Netscape format and save the downloaded <code>cookies.txt</code> file to your phone.</li>
+<li>Return to this Clipper page in Firefox, tap Choose File below, select the downloaded <code>cookies.txt</code>, and tap Save cookies privately.</li>
+</ol>
+<p class="muted">The add-on needs browser cookie access to export your session. Export only your own account, keep the file private, and delete the downloaded copy from your phone after a successful upload. Never send the file to anyone or paste its contents into chat. If you prefer not to grant an extension cookie access, use a desktop export instead.</p>
+<form id="cookie-form"><label for="cookies">Netscape cookies file (.txt)</label><input type="file" id="cookies" accept=".txt,.cookies,text/plain" required><button class="secondary" type="submit">Save cookies privately</button></form><p id="cookie-status" class="muted" aria-live="polite"></p>
 </section>
 <section class="panel"><h2>Optional desktop browser connector</h2>
 <p class="muted">The companion extension can send the active video's URL to Clipper. It does not read or transfer browser cookies. For authenticated downloads, use the private cookie upload above.</p>
