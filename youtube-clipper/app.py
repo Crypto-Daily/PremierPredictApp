@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import secrets
@@ -16,6 +17,9 @@ import whisper
 import yt_dlp
 from flask import Flask, abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from werkzeug.security import check_password_hash
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("youtube_clipper")
 
 BASE = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("CLIPPER_DATA", BASE / "data")).resolve()
@@ -180,9 +184,23 @@ def process_video(job_id: str, video_url: str, count: int, clip_seconds: int, as
         update_job(job_id, status="completed", progress=100, message="Your clips are ready.",
                    title=info.get("title"), clips=clip_paths)
     except Exception as exc:
+        cookie_exists = COOKIE_FILE.is_file()
+        cookie_size = COOKIE_FILE.stat().st_size if cookie_exists else 0
+        cookie_mode = oct(COOKIE_FILE.stat().st_mode & 0o777) if cookie_exists else "missing"
+        # Log the real yt-dlp exception for diagnosis, but never log cookie contents.
+        logger.exception(
+            "Job %s failed. yt-dlp=%s cookie_file_present=%s cookie_file_bytes=%s cookie_file_mode=%s",
+            job_id, getattr(yt_dlp.version, "__version__", "unknown"),
+            cookie_exists, cookie_size, cookie_mode,
+        )
         message = str(exc)
         if "Sign in to confirm" in message or "not a bot" in message.lower():
-            message = "YouTube requires an authenticated session for this video. Export your own browser cookies in Netscape format and upload them in Settings; the cookie file stays private on this server."
+            message = (
+                "YouTube rejected the extraction request. The uploaded cookie file "
+                f"{'is present' if cookie_exists else 'is missing'} on the server "
+                f"({cookie_size} bytes; permissions {cookie_mode}). "
+                "The detailed yt-dlp error is recorded in the youtube-clipper PM2 logs."
+            )
         update_job(job_id, status="failed", progress=0, message=message)
     finally:
         shutil.rmtree(work, ignore_errors=True)
