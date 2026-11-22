@@ -2,12 +2,14 @@ from __future__ import annotations
 import json, logging, os, re, secrets, shutil, subprocess, threading, time, uuid
 from pathlib import Path
 import requests, whisper
+from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("video_highlights")
 BASE = Path(__file__).resolve().parent
+load_dotenv(BASE / ".env")
 DATA = Path(os.environ.get("CLIPPER_DATA", BASE / "data")).resolve()
 JOBS, INCOMING = DATA / "jobs", DATA / "incoming"
 for folder in (JOBS, INCOMING):
