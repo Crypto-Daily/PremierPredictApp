@@ -121,3 +121,20 @@ The optional companion extension lets you explicitly send the active YouTube vid
 The pairing code expires after 10 minutes and can be used once. Pairing creates a random bearer token; only its SHA-256 hash is stored in the private data directory. The extension reads only the active tab URL after an explicit click; it does not read page contents, inspect cookies, or collect browsing history.
 
 This connector hands off the video URL to the existing yt-dlp pipeline. It does not bypass YouTube restrictions or grant permission to download content.
+
+
+## Upload and schedule clips to YouTube
+
+The Clipper can upload a generated MP4 directly to the YouTube channel you authorize and ask YouTube to publish it at a future time. The server uploads the file first; once YouTube accepts the scheduled video, the VPS does not need to stay awake for the publication itself.
+
+1. In Google Cloud Console, create a project and enable **YouTube Data API v3**.
+2. Configure the OAuth consent screen and create an OAuth 2.0 **Web application** client.
+3. Add this exact authorized redirect URI to that client: `https://YOUR-CLIPPER-HOST/oauth/youtube/callback`.
+4. Store the downloaded OAuth client JSON outside the repository with permissions `600`.
+5. Set `YOUTUBE_CLIENT_SECRETS=/secure/path/client_secret.json` and `YOUTUBE_REDIRECT_URI=https://YOUR-CLIPPER-HOST/oauth/youtube/callback` in the private server environment.
+6. Install the added Python requirements, restart the Clipper, sign in, and choose **Connect YouTube channel**.
+7. For each generated clip, enter a title, description and future publication time, then submit it. The clip is uploaded as private with YouTube's scheduled `publishAt` value.
+
+The app requests the `youtube.upload` OAuth scope only. OAuth tokens are stored in the private data directory with file mode 0600. Never commit OAuth client JSON or token files.
+
+YouTube scheduled publication requires the video to remain private and not have been previously published. Google API quota and OAuth verification/testing restrictions may apply. See the official [YouTube upload guide](https://developers.google.com/youtube/data/guides/uploading_a_video) and [video resource status documentation](https://developers.google.com/youtube/data/reference/rest/v3/videos).
