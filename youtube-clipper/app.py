@@ -10,7 +10,6 @@ import subprocess
 import threading
 import time
 import uuid
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -18,7 +17,6 @@ import whisper
 import yt_dlp
 from flask import Flask, abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from werkzeug.security import check_password_hash
-from youtube_publisher import make_flow, save_credentials, upload_scheduled_video
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("youtube_clipper")
@@ -343,77 +341,6 @@ def create_job():
     return jsonify(id=job_id), 202
 
 
-@app.get("/youtube/connect")
-def youtube_connect():
-    require_login()
-    flow = make_flow()
-    authorization_url, state = flow.authorization_url(
-        access_type="offline", include_granted_scopes="true", prompt="consent"
-    )
-    session["youtube_oauth_state"] = state
-    return redirect(authorization_url)
-
-
-@app.get("/oauth/youtube/callback")
-def youtube_callback():
-    require_login()
-    state = session.pop("youtube_oauth_state", None)
-    if not state or request.args.get("state") != state:
-        abort(400, "Invalid YouTube authorization state.")
-    flow = make_flow(state=state)
-    flow.fetch_token(authorization_response=request.url)
-    save_credentials(DATA, flow.credentials)
-    return redirect(url_for("index") + "?youtube=connected")
-
-
-def process_scheduled_publish(job_id: str, clip_path: Path, title: str, description: str, publish_at: datetime):
-    update_job(job_id, status="uploading", progress=10, message="Uploading clip to YouTube…")
-    try:
-        result = upload_scheduled_video(DATA, clip_path, title, description, publish_at)
-        update_job(job_id, status="published", progress=100,
-                   message="Upload complete. YouTube has scheduled this video.",
-                   youtube=result)
-    except Exception as exc:
-        logger.exception("YouTube scheduled upload failed for job %s", job_id)
-        update_job(job_id, status="failed", progress=0, message=str(exc)[:500])
-
-
-@app.post("/api/publish")
-def publish_clip():
-    require_login()
-    if request.headers.get("X-CSRF-Token") != session.get("csrf"):
-        abort(403)
-    data = request.get_json(silent=True) or {}
-    filename = str(data.get("file", ""))
-    if not re.fullmatch(r"[a-f0-9]{32}_[0-9]{2}\.mp4", filename):
-        return jsonify(error="Invalid clip file."), 400
-    clip_path = OUTPUTS / filename
-    if not clip_path.is_file():
-        abort(404)
-    title = str(data.get("title", "")).strip()
-    description = str(data.get("description", "")).strip()
-    if not title:
-        return jsonify(error="Enter a YouTube title before scheduling."), 400
-    try:
-        publish_at = datetime.fromisoformat(str(data.get("publish_at", "")).replace("Z", "+00:00"))
-        if publish_at.tzinfo is None:
-            return jsonify(error="Choose a publication time with a timezone."), 400
-        if publish_at <= datetime.now(publish_at.tzinfo):
-            return jsonify(error="Choose a publication time in the future."), 400
-        job_id = uuid.uuid4().hex
-        record = {"id": job_id, "status": "queued", "progress": 0,
-                  "message": "Waiting to upload to YouTube…", "created": int(time.time())}
-        with jobs_lock:
-            jobs[job_id] = record
-            (JOBS / f"{job_id}.json").write_text(json.dumps(record, indent=2))
-        threading.Thread(target=process_scheduled_publish,
-            args=(job_id, clip_path, title, description, publish_at), daemon=True).start()
-        return jsonify(id=job_id), 202
-    except Exception as exc:
-        logger.exception("YouTube scheduled upload failed for %s", filename)
-        return jsonify(error=str(exc)[:500]), 400
-
-
 @app.post("/api/upload")
 def upload_source_video():
     require_login()
@@ -448,6 +375,46 @@ def upload_source_video():
     return jsonify(id=job_id), 202
 
 
+@app.post("/api/jobs/<job_id>/delete")
+def delete_job(job_id):
+    require_login()
+    if request.headers.get("X-CSRF-Token") != session.get("csrf"):
+        abort(403)
+    if not re.fullmatch(r"[a-f0-9]{32}", job_id):
+        abort(404)
+    manifest_path = OUTPUTS / f"{job_id}.json"
+    record_path = JOBS / f"{job_id}.json"
+    with jobs_lock:
+        record = jobs.get(job_id)
+        if record is None and record_path.is_file():
+            try:
+                record = json.loads(record_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                abort(404)
+        if record is None:
+            abort(404)
+        if record.get("status") not in ("completed", "failed"):
+            return jsonify(error="This job is still processing. Wait until it finishes before deleting it."), 409
+        if manifest_path.is_file():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                manifest = {}
+        else:
+            manifest = {}
+        for clip in manifest.get("clips", record.get("clips", [])):
+            filename = clip.get("file", "")
+            if re.fullmatch(r"[a-f0-9]{32}_[0-9]{2}\\.mp4", filename) and filename.startswith(job_id + "_"):
+                (OUTPUTS / filename).unlink(missing_ok=True)
+        manifest_path.unlink(missing_ok=True)
+        record_path.unlink(missing_ok=True)
+        shutil.rmtree(JOBS / job_id, ignore_errors=True)
+        for uploaded in INCOMING.glob(job_id + ".*"):
+            uploaded.unlink(missing_ok=True)
+        jobs.pop(job_id, None)
+    return jsonify(message="This job and its generated files have been deleted.")
+
+
 @app.get("/api/jobs/<job_id>")
 def job_status(job_id):
     require_login()
@@ -459,27 +426,6 @@ def job_status(job_id):
             abort(404)
         item = json.loads(path.read_text())
     return jsonify(item)
-
-
-@app.post("/api/cookies")
-def upload_cookies():
-    require_login()
-    if request.headers.get("X-CSRF-Token") != session.get("csrf"):
-        abort(403)
-    uploaded = request.files.get("cookies")
-    if not uploaded or not uploaded.filename.endswith((".txt", ".cookies")):
-        return jsonify(error="Choose a Netscape-format cookie .txt file."), 400
-    raw = uploaded.read(1024 * 1024 + 1)
-    if len(raw) > 1024 * 1024 or b"<!DOCTYPE" in raw[:100].upper():
-        return jsonify(error="Cookie file is invalid or too large."), 400
-    if b" Netscape HTTP Cookie File" not in raw[:500] and b"#HttpOnly_" not in raw[:500]:
-        return jsonify(error="This does not look like a Netscape-format cookies file."), 400
-    temp = UPLOADS / f".cookies-{secrets.token_hex(8)}"
-    temp.write_bytes(raw)
-    temp.chmod(0o600)
-    temp.replace(COOKIE_FILE)
-    COOKIE_FILE.chmod(0o600)
-    return jsonify(message="Private cookies saved on this server.")
 
 
 @app.get("/clips/<path:filename>")
