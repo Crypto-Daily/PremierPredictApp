@@ -27,6 +27,18 @@ CHAT_ID, MODEL_NAME = os.environ.get("WHATSAPP_CHAT_ID", "").strip(), os.environ
 jobs, upload_locks = {}, {}
 lock, model_lock = threading.RLock(), threading.Lock()
 whisper_model = None
+# Restore small job records so a PM2 restart does not lose delivery retry state.
+for saved in JOBS.glob("*.json"):
+    try:
+        item = json.loads(saved.read_text(encoding="utf-8"))
+        if item.get("pipeline") == "whatsapp-highlights" and item.get("id"):
+            if item.get("status") == "sending":
+                item["status"] = "delivery_failed"
+                item["message"] = "The app restarted during WhatsApp delivery. Retry to send any clips not yet accepted."
+                saved.write_text(json.dumps(item), encoding="utf-8")
+            jobs[item["id"]] = item
+    except (OSError, json.JSONDecodeError):
+        log.warning("Skipping unreadable job record: %s", saved.name)
 
 def logged_in(): return session.get("authenticated") is True
 def require_login():
@@ -199,7 +211,7 @@ def index():
 @app.get("/health")
 def health():
     return jsonify(status="ok",app="private-video-highlights",
-                   whatsapp_configured=bool(CHAT_ID),bridge=BRIDGE)
+                   whatsapp_configured=bool(CHAT_ID))
 
 @app.post("/api/upload/init")
 def init_upload():
@@ -268,7 +280,7 @@ def complete_upload(upload_id):
         video.replace(source); shutil.rmtree(folder,ignore_errors=True); upload_locks.pop(upload_id,None)
     except (OSError,json.JSONDecodeError): abort(404)
     source.chmod(0o600)
-    record={"id":job_id,"status":"queued","progress":1,"message":"Upload complete. Starting analysis…",
+    record={"id":job_id,"pipeline":"whatsapp-highlights","status":"queued","progress":1,"message":"Upload complete. Starting analysis…",
             "created":int(time.time()),"clips":[],"sent_indices":[],"requested_clips":meta["count"],"storage_cleared":False}
     with lock:
         jobs[job_id]=record
