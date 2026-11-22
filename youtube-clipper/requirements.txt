@@ -3,3 +3,6 @@ Werkzeug>=3.0
 yt-dlp[default]>=2025.1.0
 openai-whisper>=20231117
 bgutil-ytdlp-pot-provider>=2.0.2
+google-api-python-client>=2.150.0
+google-auth-oauthlib>=1.2.1
+google-auth-httplib2>=0.2.0
