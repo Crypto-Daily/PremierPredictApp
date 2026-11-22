@@ -366,6 +366,18 @@ def youtube_callback():
     return redirect(url_for("index") + "?youtube=connected")
 
 
+def process_scheduled_publish(job_id: str, clip_path: Path, title: str, description: str, publish_at: datetime):
+    update_job(job_id, status="uploading", progress=10, message="Uploading clip to YouTube…")
+    try:
+        result = upload_scheduled_video(DATA, clip_path, title, description, publish_at)
+        update_job(job_id, status="published", progress=100,
+                   message="Upload complete. YouTube has scheduled this video.",
+                   youtube=result)
+    except Exception as exc:
+        logger.exception("YouTube scheduled upload failed for job %s", job_id)
+        update_job(job_id, status="failed", progress=0, message=str(exc)[:500])
+
+
 @app.post("/api/publish")
 def publish_clip():
     require_login()
@@ -373,7 +385,7 @@ def publish_clip():
         abort(403)
     data = request.get_json(silent=True) or {}
     filename = str(data.get("file", ""))
-    if not (len(filename) == 39 and filename[:32].isalnum() and filename[32] == "_" and filename[33:35].isdigit() and filename[35:] == ".mp4"):
+    if not re.fullmatch(r"[a-f0-9]{32}_[0-9]{2}\.mp4", filename):
         return jsonify(error="Invalid clip file."), 400
     clip_path = OUTPUTS / filename
     if not clip_path.is_file():
@@ -384,8 +396,19 @@ def publish_clip():
         return jsonify(error="Enter a YouTube title before scheduling."), 400
     try:
         publish_at = datetime.fromisoformat(str(data.get("publish_at", "")).replace("Z", "+00:00"))
-        result = upload_scheduled_video(DATA, clip_path, title, description, publish_at)
-        return jsonify(result), 201
+        if publish_at.tzinfo is None:
+            return jsonify(error="Choose a publication time with a timezone."), 400
+        if publish_at <= datetime.now(publish_at.tzinfo):
+            return jsonify(error="Choose a publication time in the future."), 400
+        job_id = uuid.uuid4().hex
+        record = {"id": job_id, "status": "queued", "progress": 0,
+                  "message": "Waiting to upload to YouTube…", "created": int(time.time())}
+        with jobs_lock:
+            jobs[job_id] = record
+            (JOBS / f"{job_id}.json").write_text(json.dumps(record, indent=2))
+        threading.Thread(target=process_scheduled_publish,
+            args=(job_id, clip_path, title, description, publish_at), daemon=True).start()
+        return jsonify(id=job_id), 202
     except Exception as exc:
         logger.exception("YouTube scheduled upload failed for %s", filename)
         return jsonify(error=str(exc)[:500]), 400
