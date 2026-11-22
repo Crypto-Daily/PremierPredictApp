@@ -77,41 +77,43 @@ def run_command(args: list[str]):
     subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 
+def yt_dlp_runtime_options():
+    """Use Node for YouTube JS challenges and fetch yt-dlp's EJS solver when needed."""
+    node_path = os.environ.get("YT_DLP_NODE_PATH") or shutil.which("node") or "/home/ubuntu/.local/bin/node"
+    if not Path(node_path).is_file():
+        raise RuntimeError(f"yt-dlp JavaScript runtime was not found: {node_path}")
+    return {
+        "js_runtimes": {"node": {"path": node_path}},
+        "remote_components": ["ejs:github"],
+    }
+
+
 def extract_youtube_info(video_url: str):
-    """Try YouTube player clients that can expose downloadable formats without a PO token."""
-    # The current yt-dlp guidance recommends mweb with a PO-token provider.
-    # The bgutil plugin supplies fresh, video-bound tokens automatically.
-    attempts = [
-        ("mweb_with_po_token", {"youtube": {"player_client": ["mweb", "web_safari"]}}),
-        ("android_vr_fallback", {"youtube": {"player_client": ["android_vr"]}}),
-    ]
-    failures = []
-    for client_name, extractor_args in attempts:
-        info_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "socket_timeout": 30,
-        }
-        if COOKIE_FILE.exists():
-            info_opts["cookiefile"] = str(COOKIE_FILE)
-        if extractor_args:
-            info_opts["extractor_args"] = extractor_args
-        try:
-            with yt_dlp.YoutubeDL(info_opts) as ydl:
-                info = ydl.extract_info(video_url, download=False)
-            if info and (info.get("formats") or info.get("url")):
-                logger.info("YouTube metadata extracted using player client: %s", client_name)
-                return info, extractor_args
-            failures.append(f"{client_name}: no downloadable formats returned")
-        except Exception as exc:
-            failures.append(f"{client_name}: {str(exc)[:240]}")
-            logger.warning("YouTube extraction attempt failed for client %s: %s", client_name, str(exc)[:240])
-    raise RuntimeError(
-        "YouTube did not provide downloadable formats. The mweb attempt requires the "
-        "BgUtils PO-token plugin and its local token generator; verify both are installed "
-        "and available to this Python environment. Details: " + " | ".join(failures)
-    )
+    """Extract YouTube metadata using mweb, uploaded cookies, BgUtils PO tokens and Node."""
+    extractor_args = {"youtube": {"player_client": ["mweb"]}}
+    info_opts = {
+        "quiet": True,
+        "no_warnings": False,
+        "noplaylist": True,
+        "socket_timeout": 30,
+        "extractor_args": extractor_args,
+        **yt_dlp_runtime_options(),
+    }
+    if COOKIE_FILE.exists():
+        info_opts["cookiefile"] = str(COOKIE_FILE)
+    try:
+        with yt_dlp.YoutubeDL(info_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+        if info and (info.get("formats") or info.get("url")):
+            logger.info("YouTube metadata extracted using mweb, Node JS runtime and BgUtils PO tokens")
+            return info, extractor_args
+        raise RuntimeError("mweb returned no downloadable formats")
+    except Exception as exc:
+        logger.exception("YouTube mweb extraction failed")
+        raise RuntimeError(
+            "YouTube extraction failed with mweb + Node JS challenge solving + BgUtils PO tokens: "
+            + str(exc)[:500]
+        ) from exc
 
 
 def load_model():
@@ -173,8 +175,15 @@ def process_video(job_id: str, video_url: str, count: int, clip_seconds: int, as
             raise ValueError(f"Video duration must be between 1 second and {MAX_VIDEO_SECONDS // 3600} hours.")
         title = re.sub(r"[^a-zA-Z0-9_-]+", "_", info.get("title") or "video")[:70].strip("_") or "video"
         source = work / "source.%(ext)s"
-        opts = {"format": "bestvideo*+bestaudio/best", "outtmpl": str(source),
-                "merge_output_format": "mp4", "quiet": True, "no_warnings": True, "noplaylist": True}
+        opts = {
+            "format": "bestvideo*+bestaudio/best",
+            "outtmpl": str(source),
+            "merge_output_format": "mp4",
+            "quiet": True,
+            "no_warnings": False,
+            "noplaylist": True,
+            **yt_dlp_runtime_options(),
+        }
         if COOKIE_FILE.exists():
             opts["cookiefile"] = str(COOKIE_FILE)
         if selected_extractor_args:
