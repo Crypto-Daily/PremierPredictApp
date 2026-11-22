@@ -68,58 +68,39 @@ cd /opt/youtube-clipper
 python app.py
 ```
 
-The app binds to 127.0.0.1:8765. Put it behind an HTTPS reverse proxy or a private Cloudflare Tunnel before using it from your phone. Do not expose the Flask development server directly to the internet. For a reverse proxy, preserve HTTPS so the secure session cookie works.
+The app binds to 127.0.0.1:8765. The deployed PM2 entry starts the Flask app and its supervised Cloudflare Quick Tunnel together. Keep the dashboard behind HTTPS and use a strong password.
 
-## systemd service
+## Cookies — Android or desktop
 
-Create `/etc/systemd/system/youtube-clipper.service`:
+Signing in to YouTube in a phone browser does not automatically share that browser session with yt-dlp on the server. You must explicitly export a Netscape-format cookie file and upload it through the signed-in Clipper dashboard.
 
-```ini
-[Unit]
-Description=Private YouTube clipper
-After=network.target
+### Android Firefox
 
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/opt/youtube-clipper
-EnvironmentFile=/etc/youtube-clipper.env
-ExecStart=/opt/youtube-clipper/.venv/bin/python /opt/youtube-clipper/app.py
-Restart=on-failure
-RestartSec=5
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ReadWritePaths=/var/lib/youtube-clipper
+1. Install [Firefox for Android](https://www.mozilla.org/firefox/browsers/mobile/android/).
+2. Sign in to YouTube in Firefox.
+3. Install Mozilla's [cookies.txt add-on](https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/). Review its requested browser permissions before installing; cookie-export extensions need permission to read browser cookies.
+4. Open YouTube in the same signed-in Firefox profile and use the add-on to export a Netscape-format `cookies.txt` file.
+5. Return to the Clipper dashboard in Firefox, choose the downloaded file in **YouTube login — import from this phone**, and tap **Save cookies privately**.
+6. After the server confirms the upload, delete the downloaded cookie file from the phone.
 
-[Install]
-WantedBy=multi-user.target
-```
+### Desktop
 
-Then:
+Export your own YouTube cookies from your signed-in browser in Netscape format, then upload the `.txt` file through the dashboard.
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now youtube-clipper
-sudo systemctl status youtube-clipper
-```
-
-## Cookies
-
-Export cookies from your own browser session in Netscape format, then upload the file through the signed-in app. The server stores it under the private data directory with mode 0600. Never commit cookies or send them in chat. Re-export them when they expire.
+The server stores the cookie file under its private data directory with mode 0600 and yt-dlp uses it for both video information and downloads. Cookie files are equivalent to account access: never share them, commit them, or paste their contents into chat. Re-export them when they expire. Uploading replaces the previous cookie file.
 
 ## Notes and limitations
 
+- A cookie export is a sensitive credential. The app does not read cookies directly from your phone; the user chooses and uploads the exported file.
 - The first version selects clips using transcript keyword, punctuation, and sentence-structure heuristics. It is not semantic editorial judgment; inspect the results.
 - Whisper model sizes: `tiny`, `base`, `small`, `medium`, `large`. Set `WHISPER_MODEL` before starting. Larger models need more memory and time.
 - Jobs are processed in background threads. A process restart stops active jobs; completed files remain in the data directory.
 - The source video is removed from temporary work storage after rendering. Generated MP4s and job metadata remain.
 - Use HTTPS and a strong password. The app has no public registration or multi-user feature.
 
-
 ## Desktop browser connector (Edge / Chrome)
 
-The optional companion extension lets you explicitly send the active YouTube video URL to the private Clipper. It does **not** collect browser cookies or automate sign-in. For authenticated yt-dlp downloads, export your own YouTube cookies locally in Netscape format and upload them through the private cookie upload control in the Clipper dashboard.
+The optional companion extension lets you explicitly send the active YouTube video URL to the private Clipper. It does **not** collect browser cookies or automate sign-in. For authenticated yt-dlp downloads, export your own cookies locally in Netscape format and upload them through the private cookie upload control in the Clipper dashboard.
 
 ### Install the extension in Microsoft Edge
 
@@ -132,11 +113,11 @@ The optional companion extension lets you explicitly send the active YouTube vid
 ### Pair and send a video
 
 1. Sign in to the Clipper dashboard over HTTPS.
-2. In **Connect your desktop browser**, click **Generate one-time pairing code**.
-3. Open the extension, enter the Clipper's HTTPS address and the one-time code, then choose **Connect browser**. Edge asks permission for that specific Clipper origin.
+2. Click **Generate one-time pairing code**.
+3. Open the extension, enter the Clipper's HTTPS address and the one-time code, then choose **Connect browser**.
 4. Open a YouTube video you own or are authorized to process.
 5. Click the extension and choose **Send this YouTube video**. The job appears in the existing Clipper queue.
 
-The pairing code expires after 10 minutes and can be used once. Pairing creates a random bearer token; only its SHA-256 hash is stored in the private data directory. Pairing again replaces the previous token. The extension reads only the active tab URL after an explicit click; it does not read page contents, inspect cookies, or collect browsing history. Use HTTPS for the Clipper address. Revoke access by pairing a new extension/browser or removing `data/private/browser-extension-token.sha256` and restarting the app.
+The pairing code expires after 10 minutes and can be used once. Pairing creates a random bearer token; only its SHA-256 hash is stored in the private data directory. The extension reads only the active tab URL after an explicit click; it does not read page contents, inspect cookies, or collect browsing history.
 
-This connector hands off the video URL to the existing yt-dlp pipeline. It does not bypass YouTube restrictions or grant permission to download content. YouTube may still require the user to use a permitted download path or the existing private cookie-upload flow.
+This connector hands off the video URL to the existing yt-dlp pipeline. It does not bypass YouTube restrictions or grant permission to download content.
