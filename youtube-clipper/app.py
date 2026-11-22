@@ -26,7 +26,8 @@ DATA = Path(os.environ.get("CLIPPER_DATA", BASE / "data")).resolve()
 JOBS = DATA / "jobs"
 OUTPUTS = DATA / "clips"
 UPLOADS = DATA / "private"
-for folder in (JOBS, OUTPUTS, UPLOADS):
+INCOMING = DATA / "incoming"
+for folder in (JOBS, OUTPUTS, UPLOADS, INCOMING):
     folder.mkdir(parents=True, exist_ok=True)
     try:
         folder.chmod(0o700)
@@ -37,7 +38,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "1") == "1",
-                  MAX_CONTENT_LENGTH=2 * 1024 * 1024)
+                  MAX_CONTENT_LENGTH=int(os.environ.get("MAX_UPLOAD_BYTES", str(4 * 1024 * 1024 * 1024))))
 PASSWORD_HASH = os.environ.get("APP_PASSWORD_HASH", "")
 PASSWORD = os.environ.get("APP_PASSWORD", "")
 COOKIE_FILE = UPLOADS / "youtube-cookies.txt"
@@ -164,36 +165,51 @@ def choose_highlights(segments, video_duration: float, count: int, clip_seconds:
     return sorted(chosen, key=lambda x: x["start"])
 
 
-def process_video(job_id: str, video_url: str, count: int, clip_seconds: int, aspect: str):
+def process_video(job_id: str, video_url: str, count: int, clip_seconds: int, aspect: str, source_path: Path | None = None):
     work = JOBS / job_id
     work.mkdir(parents=True, exist_ok=True)
     try:
-        update_job(job_id, status="downloading", progress=5, message="Getting video information…")
-        info, selected_extractor_args = extract_youtube_info(video_url)
-        duration = float(info.get("duration") or 0)
+        selected_extractor_args = None
+        if source_path is not None:
+            update_job(job_id, status="validating", progress=5, message="Checking your uploaded video…")
+            if not source_path.is_file():
+                raise FileNotFoundError("The uploaded source video is no longer available.")
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(source_path)],
+                check=True, capture_output=True, text=True, timeout=60,
+            )
+            duration = float(probe.stdout.strip())
+            info = {"title": source_path.stem, "duration": duration}
+            video = work / ("source" + source_path.suffix.lower())
+            shutil.move(str(source_path), str(video))
+        else:
+            update_job(job_id, status="downloading", progress=5, message="Getting video information…")
+            info, selected_extractor_args = extract_youtube_info(video_url)
+            duration = float(info.get("duration") or 0)
+            source = work / "source.%(ext)s"
+            opts = {
+                "format": "bestvideo*+bestaudio/best",
+                "outtmpl": str(source),
+                "merge_output_format": "mp4",
+                "quiet": True,
+                "no_warnings": False,
+                "noplaylist": True,
+                **yt_dlp_runtime_options(),
+            }
+            if COOKIE_FILE.exists():
+                opts["cookiefile"] = str(COOKIE_FILE)
+            if selected_extractor_args:
+                opts["extractor_args"] = selected_extractor_args
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([video_url])
+            videos = [p for p in work.iterdir() if p.is_file() and p.name.startswith("source.")]
+            if not videos:
+                raise RuntimeError("yt-dlp finished but no downloaded video file was found.")
+            video = videos[0]
         if duration <= 0 or duration > MAX_VIDEO_SECONDS:
             raise ValueError(f"Video duration must be between 1 second and {MAX_VIDEO_SECONDS // 3600} hours.")
         title = re.sub(r"[^a-zA-Z0-9_-]+", "_", info.get("title") or "video")[:70].strip("_") or "video"
-        source = work / "source.%(ext)s"
-        opts = {
-            "format": "bestvideo*+bestaudio/best",
-            "outtmpl": str(source),
-            "merge_output_format": "mp4",
-            "quiet": True,
-            "no_warnings": False,
-            "noplaylist": True,
-            **yt_dlp_runtime_options(),
-        }
-        if COOKIE_FILE.exists():
-            opts["cookiefile"] = str(COOKIE_FILE)
-        if selected_extractor_args:
-            opts["extractor_args"] = selected_extractor_args
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([video_url])
-        videos = [p for p in work.iterdir() if p.is_file() and p.name.startswith("source.")]
-        if not videos:
-            raise RuntimeError("yt-dlp finished but no downloaded video file was found.")
-        video = videos[0]
 
         update_job(job_id, status="transcribing", progress=35, message="Transcribing audio with Whisper…")
         model = load_model()
@@ -247,6 +263,11 @@ def process_video(job_id: str, video_url: str, count: int, clip_seconds: int, as
             )
         update_job(job_id, status="failed", progress=0, message=message)
     finally:
+        if source_path is not None:
+            try:
+                source_path.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Could not remove uploaded source file for job %s", job_id)
         shutil.rmtree(work, ignore_errors=True)
 
 
@@ -317,6 +338,40 @@ def create_job():
         jobs[job_id] = record
         (JOBS / f"{job_id}.json").write_text(json.dumps(record, indent=2))
     threading.Thread(target=process_video, args=(job_id, video_url, count, clip_seconds, aspect), daemon=True).start()
+    return jsonify(id=job_id), 202
+
+
+@app.post("/api/upload")
+def upload_source_video():
+    require_login()
+    if request.headers.get("X-CSRF-Token") != session.get("csrf"):
+        abort(403)
+    uploaded = request.files.get("video")
+    if not uploaded or not uploaded.filename:
+        return jsonify(error="Choose a video file to upload."), 400
+    suffix = Path(uploaded.filename).suffix.lower()
+    if suffix not in {".mp4", ".mov", ".m4v", ".mkv", ".webm"}:
+        return jsonify(error="Supported formats: MP4, MOV, M4V, MKV and WebM."), 400
+    try:
+        count = max(1, min(10, int(request.form.get("count", 3))))
+        clip_seconds = max(20, min(90, int(request.form.get("clip_seconds", 45))))
+    except (TypeError, ValueError):
+        return jsonify(error="Clip count and length must be numbers."), 400
+    aspect = request.form.get("aspect", "9:16")
+    if aspect not in ("9:16", "16:9", "1:1"):
+        return jsonify(error="Unsupported aspect ratio."), 400
+    job_id = uuid.uuid4().hex
+    source_path = INCOMING / f"{job_id}{suffix}"
+    uploaded.save(source_path)
+    source_path.chmod(0o600)
+    record = {"id": job_id, "status": "queued", "progress": 0,
+              "message": "Video uploaded. Queued for processing…",
+              "created": int(time.time()), "clips": [], "source_type": "upload"}
+    with jobs_lock:
+        jobs[job_id] = record
+        (JOBS / f"{job_id}.json").write_text(json.dumps(record, indent=2))
+    threading.Thread(target=process_video,
+        args=(job_id, "", count, clip_seconds, aspect, source_path), daemon=True).start()
     return jsonify(id=job_id), 202
 
 
