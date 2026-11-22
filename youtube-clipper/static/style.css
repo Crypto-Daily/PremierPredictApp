@@ -3,3 +3,5 @@
 .connect-link{display:inline-block;padding:11px 16px;border-radius:8px;background:#238636;color:#fff;text-decoration:none;font-weight:650}.clip-publish{align-items:flex-start}.clip-info{flex:1;min-width:220px}.publish-fields{flex:1;min-width:240px}.publish-fields textarea{display:block;width:100%;margin-top:7px;padding:12px;border:1px solid #484f58;border-radius:8px;background:#0d1117;color:#e6edf3;font:inherit;resize:vertical}.publish-fields label{font-size:.85rem}.publish-fields .schedule-button{width:100%}.pub-status a{color:#58a6ff}@media(max-width:650px){.clip-publish{display:block}.publish-fields{margin-top:16px}}
 
 button.danger{background:#b42318}.job-cleanup{border-top:1px solid #30363d;margin-top:18px;padding-top:14px}.job-cleanup button{width:100%;max-width:360px}
+
+.success{color:#3fb950;line-height:1.6}.error{color:#ff7b72;line-height:1.6}#retry-delivery{background:#1f6feb}
