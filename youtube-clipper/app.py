@@ -45,6 +45,13 @@ COOKIE_FILE = UPLOADS / "youtube-cookies.txt"
 MAX_VIDEO_SECONDS = int(os.environ.get("MAX_VIDEO_SECONDS", "10800"))
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(4 * 1024 * 1024 * 1024)))
 UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
+for stale_upload in INCOMING.glob("*.chunks"):
+    try:
+        if time.time() - stale_upload.stat().st_mtime > 24 * 60 * 60:
+            shutil.rmtree(stale_upload, ignore_errors=True)
+    except OSError:
+        pass
+
 jobs_lock = threading.Lock()
 jobs: dict[str, dict] = {}
 whisper_model = None
@@ -398,6 +405,17 @@ def receive_upload_chunk(upload_id, index):
     temp.write_bytes(raw)
     temp.replace(part)
     return jsonify(received=index), 200
+
+
+@app.post("/api/upload/<upload_id>/abort")
+def abort_chunked_upload(upload_id):
+    require_login()
+    if request.headers.get("X-CSRF-Token") != session.get("csrf"):
+        abort(403)
+    if not re.fullmatch(r"[a-f0-9]{32}", upload_id):
+        abort(404)
+    shutil.rmtree(INCOMING / f"{upload_id}.chunks", ignore_errors=True)
+    return jsonify(message="Incomplete upload removed.")
 
 
 @app.post("/api/upload/<upload_id>/complete")
