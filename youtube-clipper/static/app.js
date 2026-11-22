@@ -14,19 +14,47 @@ $("clip-form").addEventListener("submit", async (event) => {
   $("status").textContent = "Uploading your video…";
   $("bar").style.width = "2%";
   $("results").innerHTML = "";
-  const form = new FormData();
-  form.append("video", sourceFile);
-  form.append("count", $("count").value);
-  form.append("clip_seconds", $("length").value);
-  form.append("aspect", $("aspect").value);
   try {
-    const response = await fetch("/api/upload", {
+    const chunkSize = 8 * 1024 * 1024;
+    const totalChunks = Math.ceil(sourceFile.size / chunkSize);
+    const initResponse = await fetch("/api/upload/init", {
       method: "POST",
-      headers: {"X-CSRF-Token": csrfToken},
-      body: form
+      headers: {"Content-Type":"application/json","X-CSRF-Token":csrfToken},
+      body: JSON.stringify({
+        filename: sourceFile.name, size: sourceFile.size, chunks: totalChunks,
+        count: $("count").value, clip_seconds: $("length").value, aspect: $("aspect").value
+      })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Could not upload video.");
+    const init = await initResponse.json();
+    if (!initResponse.ok) throw new Error(init.error || "Could not start upload.");
+    for (let index = 0; index < totalChunks; index++) {
+      const chunk = sourceFile.slice(index * chunkSize, Math.min(sourceFile.size, (index + 1) * chunkSize));
+      let uploaded = false;
+      let lastError = "Upload chunk failed.";
+      for (let attempt = 0; attempt < 3 && !uploaded; attempt++) {
+        try {
+          const chunkResponse = await fetch("/api/upload/" + init.upload_id + "/chunk/" + index, {
+            method: "PUT",
+            headers: {"X-CSRF-Token":csrfToken,"Content-Type":"application/octet-stream"},
+            body: chunk
+          });
+          const chunkData = await chunkResponse.json();
+          if (!chunkResponse.ok) throw new Error(chunkData.error || lastError);
+          uploaded = true;
+        } catch (error) {
+          lastError = error.message;
+        }
+      }
+      if (!uploaded) throw new Error("Upload stopped at part " + (index + 1) + " of " + totalChunks + ": " + lastError);
+      $("bar").style.width = Math.round(((index + 1) / totalChunks) * 15) + "%";
+      $("status").textContent = "Uploading video: " + (index + 1) + " of " + totalChunks + " parts…";
+    }
+    const completeResponse = await fetch("/api/upload/" + init.upload_id + "/complete", {
+      method: "POST",
+      headers: {"X-CSRF-Token":csrfToken}
+    });
+    const data = await completeResponse.json();
+    if (!completeResponse.ok) throw new Error(data.error || "Could not finish upload.");
     poll(data.id);
   } catch (error) {
     $("status").textContent = error.message;
