@@ -14,6 +14,7 @@ $("clip-form").addEventListener("submit", async (event) => {
   $("status").textContent = "Uploading your video…";
   $("bar").style.width = "2%";
   $("results").innerHTML = "";
+  let activeUploadId = null;
   try {
     const chunkSize = 8 * 1024 * 1024;
     const totalChunks = Math.ceil(sourceFile.size / chunkSize);
@@ -27,6 +28,7 @@ $("clip-form").addEventListener("submit", async (event) => {
     });
     const init = await initResponse.json();
     if (!initResponse.ok) throw new Error(init.error || "Could not start upload.");
+    activeUploadId = init.upload_id;
     for (let index = 0; index < totalChunks; index++) {
       const chunk = sourceFile.slice(index * chunkSize, Math.min(sourceFile.size, (index + 1) * chunkSize));
       let uploaded = false;
@@ -55,8 +57,12 @@ $("clip-form").addEventListener("submit", async (event) => {
     });
     const data = await completeResponse.json();
     if (!completeResponse.ok) throw new Error(data.error || "Could not finish upload.");
+    activeUploadId = null;
     poll(data.id);
   } catch (error) {
+    if (activeUploadId) {
+      try { await fetch("/api/upload/" + activeUploadId + "/abort", {method:"POST",headers:{"X-CSRF-Token":csrfToken}}); } catch {}
+    }
     $("status").textContent = error.message;
     $("start").disabled = false;
   }
