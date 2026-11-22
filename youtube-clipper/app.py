@@ -43,6 +43,8 @@ PASSWORD_HASH = os.environ.get("APP_PASSWORD_HASH", "")
 PASSWORD = os.environ.get("APP_PASSWORD", "")
 COOKIE_FILE = UPLOADS / "youtube-cookies.txt"
 MAX_VIDEO_SECONDS = int(os.environ.get("MAX_VIDEO_SECONDS", "10800"))
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(4 * 1024 * 1024 * 1024)))
+UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 jobs_lock = threading.Lock()
 jobs: dict[str, dict] = {}
 whisper_model = None
@@ -341,37 +343,105 @@ def create_job():
     return jsonify(id=job_id), 202
 
 
-@app.post("/api/upload")
-def upload_source_video():
+@app.post("/api/upload/init")
+def init_chunked_upload():
     require_login()
     if request.headers.get("X-CSRF-Token") != session.get("csrf"):
         abort(403)
-    uploaded = request.files.get("video")
-    if not uploaded or not uploaded.filename:
-        return jsonify(error="Choose a video file to upload."), 400
-    suffix = Path(uploaded.filename).suffix.lower()
+    data = request.get_json(silent=True) or {}
+    filename = Path(str(data.get("filename", ""))).name
+    suffix = Path(filename).suffix.lower()
     if suffix not in {".mp4", ".mov", ".m4v", ".mkv", ".webm"}:
         return jsonify(error="Supported formats: MP4, MOV, M4V, MKV and WebM."), 400
     try:
-        count = max(1, min(10, int(request.form.get("count", 3))))
-        clip_seconds = max(20, min(90, int(request.form.get("clip_seconds", 45))))
+        size = int(data.get("size", 0))
+        count = max(1, min(10, int(data.get("count", 3))))
+        clip_seconds = max(20, min(90, int(data.get("clip_seconds", 45))))
+        chunks = int(data.get("chunks", 0))
     except (TypeError, ValueError):
-        return jsonify(error="Clip count and length must be numbers."), 400
-    aspect = request.form.get("aspect", "9:16")
+        return jsonify(error="Invalid upload details."), 400
+    expected_chunks = (size + UPLOAD_CHUNK_BYTES - 1) // UPLOAD_CHUNK_BYTES
+    if size <= 0 or size > MAX_UPLOAD_BYTES or chunks != expected_chunks or chunks > 1000:
+        return jsonify(error=f"File must be between 1 byte and {MAX_UPLOAD_BYTES // (1024**3)} GiB."), 400
+    aspect = data.get("aspect", "9:16")
     if aspect not in ("9:16", "16:9", "1:1"):
         return jsonify(error="Unsupported aspect ratio."), 400
+    upload_id = uuid.uuid4().hex
+    folder = INCOMING / f"{upload_id}.chunks"
+    folder.mkdir(mode=0o700)
+    meta = {"suffix": suffix, "size": size, "chunks": chunks,
+            "count": count, "clip_seconds": clip_seconds, "aspect": aspect}
+    (folder / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    return jsonify(upload_id=upload_id, chunk_size=UPLOAD_CHUNK_BYTES), 201
+
+
+@app.put("/api/upload/<upload_id>/chunk/<int:index>")
+def receive_upload_chunk(upload_id, index):
+    require_login()
+    if request.headers.get("X-CSRF-Token") != session.get("csrf"):
+        abort(403)
+    if not re.fullmatch(r"[a-f0-9]{32}", upload_id):
+        abort(404)
+    folder = INCOMING / f"{upload_id}.chunks"
+    try:
+        meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        abort(404)
+    if index < 0 or index >= meta["chunks"]:
+        abort(404)
+    raw = request.get_data(cache=False)
+    expected_size = min(UPLOAD_CHUNK_BYTES, meta["size"] - index * UPLOAD_CHUNK_BYTES)
+    if len(raw) != expected_size:
+        return jsonify(error=f"Chunk {index + 1} has an unexpected size. Please retry."), 400
+    part = folder / f"part-{index:06d}"
+    temp = folder / f".part-{index:06d}.tmp"
+    temp.write_bytes(raw)
+    temp.replace(part)
+    return jsonify(received=index), 200
+
+
+@app.post("/api/upload/<upload_id>/complete")
+def complete_chunked_upload(upload_id):
+    require_login()
+    if request.headers.get("X-CSRF-Token") != session.get("csrf"):
+        abort(403)
+    if not re.fullmatch(r"[a-f0-9]{32}", upload_id):
+        abort(404)
+    folder = INCOMING / f"{upload_id}.chunks"
+    try:
+        meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        abort(404)
+    parts = [folder / f"part-{index:06d}" for index in range(meta["chunks"])]
+    if any(not part.is_file() for part in parts):
+        return jsonify(error="Some upload chunks are missing. Please retry the upload."), 409
     job_id = uuid.uuid4().hex
-    source_path = INCOMING / f"{job_id}{suffix}"
-    uploaded.save(source_path)
-    source_path.chmod(0o600)
+    source_path = INCOMING / f"{job_id}{meta['suffix']}"
+    written = 0
+    try:
+        with source_path.open("wb") as target:
+            for part in parts:
+                with part.open("rb") as source:
+                    shutil.copyfileobj(source, target)
+                written += part.stat().st_size
+        if written != meta["size"]:
+            source_path.unlink(missing_ok=True)
+            return jsonify(error="The uploaded file size does not match. Please upload again."), 400
+        source_path.chmod(0o600)
+    except Exception:
+        source_path.unlink(missing_ok=True)
+        raise
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
     record = {"id": job_id, "status": "queued", "progress": 0,
-              "message": "Video uploaded. Queued for processing…",
+              "message": "Upload complete. Queued for processing…",
               "created": int(time.time()), "clips": [], "source_type": "upload"}
     with jobs_lock:
         jobs[job_id] = record
         (JOBS / f"{job_id}.json").write_text(json.dumps(record, indent=2))
     threading.Thread(target=process_video,
-        args=(job_id, "", count, clip_seconds, aspect, source_path), daemon=True).start()
+        args=(job_id, "", meta["count"], meta["clip_seconds"], meta["aspect"], source_path),
+        daemon=True).start()
     return jsonify(id=job_id), 202
 
 
