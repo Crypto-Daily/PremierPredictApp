@@ -44,9 +44,9 @@ async function poll(id) {
     $("bar").style.width = (job.progress || 0)+"%";
     if (job.status === "completed") {
       $("start").disabled = false;
-      $("results").innerHTML = (job.clips || []).map((clip) => {
+      $("results").innerHTML = (job.clips || []).map((clip, index) => {
         const link = "/clips/"+encodeURIComponent(clip.file);
-        return '<article class="clip"><div><strong>'+escapeHtml(clip.name)+'</strong><p>'+clip.start+'s – '+clip.end+'s</p><p>'+escapeHtml(clip.transcript || "Transcript unavailable")+'</p></div><a href="'+link+'">Download MP4</a></article>';
+        return '<article class="clip clip-publish"><div class="clip-info"><strong>'+escapeHtml(clip.name)+'</strong><p>'+clip.start+'s – '+clip.end+'s</p><p>'+escapeHtml(clip.transcript || "Transcript unavailable")+'</p><a href="'+link+'">Download MP4</a></div><div class="publish-fields"><label>YouTube title<input class="pub-title" maxlength="100" value="'+escapeHtml(clip.name.replace(/\\.mp4$/i,""))+'"></label><label>Description<textarea class="pub-description" rows="2" maxlength="5000"></textarea></label><label>Publish date and time<input class="pub-time" type="datetime-local"></label><button class="schedule-button" type="button" data-file="'+escapeHtml(clip.file)+'">Upload and schedule</button><p class="pub-status muted" aria-live="polite"></p></div></article>';
       }).join("");
       return;
     }
@@ -75,6 +75,40 @@ $("cookie-form").addEventListener("submit", async (event) => {
     $("cookies").value = "";
   } catch (error) { $("cookie-status").textContent = error.message; }
 });
+$("results").addEventListener("click", async (event) => {
+  const button = event.target.closest(".schedule-button");
+  if (!button) return;
+  const card = button.closest(".clip-publish");
+  const title = card.querySelector(".pub-title").value.trim();
+  const description = card.querySelector(".pub-description").value;
+  const localTime = card.querySelector(".pub-time").value;
+  const status = card.querySelector(".pub-status");
+  if (!title || !localTime) {
+    status.textContent = "Enter a title and future publication time.";
+    return;
+  }
+  const publishAt = new Date(localTime);
+  if (Number.isNaN(publishAt.getTime()) || publishAt <= new Date()) {
+    status.textContent = "Choose a publication time in the future.";
+    return;
+  }
+  button.disabled = true;
+  status.textContent = "Uploading clip to YouTube and scheduling it…";
+  try {
+    const response = await fetch("/api/publish", {
+      method:"POST", headers,
+      body:JSON.stringify({file:button.dataset.file,title,description,publish_at:publishAt.toISOString()})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not schedule this clip.");
+    status.innerHTML = 'Scheduled successfully: <a target="_blank" rel="noopener" href="'+data.url+'">View on YouTube</a>';
+    button.textContent = "Scheduled";
+  } catch (error) {
+    status.textContent = error.message;
+    button.disabled = false;
+  }
+});
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 }
