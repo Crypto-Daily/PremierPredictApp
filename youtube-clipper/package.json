@@ -1,12 +1,12 @@
 {
   "name": "private-video-highlights-whatsapp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Dedicated Baileys WhatsApp session for the private video clipper",
   "main": "whatsapp.js",
   "engines": { "node": ">=20" },
   "dependencies": {
-    "@whiskeysockets/baileys": "6.7.18",
+    "@whiskeysockets/baileys": "6.7.24",
     "qrcode": "1.5.4"
   }
 }
