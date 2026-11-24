@@ -2,6 +2,7 @@ from __future__ import annotations
 import json, logging, os, re, secrets, shutil, subprocess, threading, time, uuid
 from pathlib import Path
 import whisper
+from clip_quality import create_styled_captions, rank_clip_quality
 from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for, send_file
 from werkzeug.security import check_password_hash
@@ -104,15 +105,30 @@ def process_video(job_id, source_path, requested):
         duration=float(probe.stdout.strip())
         if duration <= 0 or duration > MAX_DURATION:
             raise ValueError(f"Video duration must be between 1 second and {MAX_DURATION//3600} hours.")
-        write_job(job_id,status="transcribing",progress=20,message="AI is analysing the spoken content…")
-        transcript=load_model().transcribe(str(source),fp16=False,verbose=False)
-        picks=choose_highlights(transcript.get("segments",[]),duration,requested)
-        write_job(job_id,status="rendering",progress=55,message=f"Creating {len(picks)} clips (maximum 90 seconds each)…")
+
+        write_job(job_id,status="transcribing",progress=20,message="AI is transcribing speech and finding highlight moments…")
+        transcript=load_model().transcribe(str(source),fp16=False,verbose=False,word_timestamps=True)
+        segments=transcript.get("segments",[])
+        picks=choose_highlights(segments,duration,requested)
+
+        # Rank each chosen moment using transcript hooks/dialogue/context plus
+        # sampled scene changes and audio peaks as gameplay-energy signals.
+        write_job(job_id,status="ranking",progress=45,message="Ranking clips by opening, dialogue, gameplay, context and ending…")
+        for pick in picks:
+            pick["quality"]=rank_clip_quality(source,pick,segments)
+        picks.sort(key=lambda item:item["quality"]["total"],reverse=True)
+
+        filters=subprocess.run(["ffmpeg","-hide_banner","-filters"],capture_output=True,text=True,timeout=30)
+        if "subtitles" not in (filters.stdout+filters.stderr):
+            raise RuntimeError("This FFmpeg build lacks the subtitles/libass filter. Install an FFmpeg build with libass support to burn in styled captions.")
+
+        write_job(job_id,status="rendering",progress=50,message=f"Rendering {len(picks)} vertical Reels with styled captions…")
         clips=[]
         for i,pick in enumerate(picks,1):
             output=work/f"highlight_{i:02d}.mp4"
-            # Reels/Shorts 9:16 canvas. Keep the complete original frame visible
-            # in front, and fill the portrait canvas with a blurred copy behind it.
+            caption_file=work/f"captions_{i:02d}.ass"
+            create_styled_captions(segments,float(pick["start"]),float(pick["end"]),caption_file)
+            caption_path=str(caption_file.resolve()).replace("\\","\\\\").replace(":","\\:").replace("'","\\'")
             vertical_filter = (
                 "[0:v]split=2[bg][fg];"
                 "[bg]scale=720:1280:force_original_aspect_ratio=increase,"
@@ -120,19 +136,23 @@ def process_video(job_id, source_path, requested):
                 "[fg]scale=720:1280:force_original_aspect_ratio=decrease,"
                 "setsar=1[foreground];"
                 "[background][foreground]overlay=(W-w)/2:(H-h)/2,"
+                f"subtitles=filename='{caption_path}':charenc=UTF-8,"
                 "setsar=1,format=yuv420p[v]"
             )
             subprocess.run(["ffmpeg","-y","-ss",f"{pick['start']:.3f}","-i",str(source),
                 "-t",f"{pick['end']-pick['start']:.3f}","-filter_complex",vertical_filter,
-                "-map","[v]","-map","0:a?","-c:v","libx264","-preset","veryfast","-crf","28",
-                "-c:a","aac","-b:a","96k","-movflags","+faststart",str(output)],
+                "-map","[v]","-map","0:a?","-c:v","libx264","-preset","veryfast","-crf","27",
+                "-c:a","aac","-b:a","128k","-movflags","+faststart",str(output)],
                 check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=1800)
-            clips.append({"file":output.name,"name":f"Highlight {i:02d}",
-                          "start":round(pick["start"],2),"end":round(pick["end"],2),
-                          "transcript":pick["text"][:500]})
-            write_job(job_id,progress=55+int(30*i/len(picks)),message=f"Created clip {i} of {len(picks)}…")
+            quality=pick["quality"]
+            clips.append({"file":output.name,"name":f"Rank #{i} · Highlight {i:02d}",
+                          "rank":i,"quality":quality,"start":round(pick["start"],2),
+                          "end":round(pick["end"],2),"transcript":pick["text"][:500]})
+            write_job(job_id,clips=clips,status="rendering",
+                      progress=50+int(45*i/len(picks)),
+                      message=f"Rendered ranked clip {i} of {len(picks)}…")
         write_job(job_id,clips=clips,status="ready",progress=100,
-                  message=f"Your {len(clips)} clips are ready. Preview or download them, then choose DONE & DELETE when finished.")
+                  message=f"Your {len(clips)} ranked Reels are ready with styled captions. Preview or download them, then choose DONE & DELETE when finished.")
     except Exception as exc:
         log.exception("Processing failed for job %s",job_id)
         write_job(job_id,status="failed",progress=0,message=str(exc)[:500],storage_cleared=False)
