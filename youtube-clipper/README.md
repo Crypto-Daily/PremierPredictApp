@@ -8,7 +8,7 @@ A private, single-user browser app for turning uploaded long-form videos into sh
 2. Upload MP4, MOV, M4V, MKV or WebM (default maximum 1 GiB).
 3. Choose up to 10 highlights.
 4. Whisper transcribes speech; a lightweight transcript scorer ranks non-overlapping windows up to 90 seconds each.
-5. FFmpeg renders compressed MP4 clips (up to 720p, original aspect ratio).
+5. FFmpeg renders compressed 720 × 1280 (9:16) MP4 clips. The complete original video frame stays visible in the center, while a blurred, enlarged copy fills the portrait background.
 6. Preview each clip in the browser and download clips individually or all together.
 7. When finished, press DONE & DELETE. The app deletes only that job's original video, generated clips and temporary workspace. A small job record remains so the workspace can show that it was deleted.
 
