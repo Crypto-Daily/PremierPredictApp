@@ -159,6 +159,18 @@ async function deleteJob(id,button){
   }catch(error){button.disabled=false;button.textContent="DONE & DELETE";alert(error.message);}
 }
 
+async function restoreReadyJobs(){
+  try{
+    const response=await fetch("/api/jobs");
+    const data=await jsonResponse(response);
+    if(!response.ok)throw new Error(data.error||"Could not load saved jobs.");
+    (data.jobs||[]).filter(job=>job.status==="ready").sort((a,b)=>b.created-a.created).forEach(job=>renderJob(job));
+    const ready=(data.jobs||[]).filter(job=>job.status==="ready").length;
+    if(ready)$("job-count").textContent=ready+" saved job"+(ready===1?"":"s");
+  }catch(error){console.warn("Could not restore saved clip jobs:",error.message);}
+}
+restoreReadyJobs();
+
 function escapeHtml(value){
   return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 }
