@@ -111,11 +111,22 @@ def process_video(job_id, source_path, requested):
         clips=[]
         for i,pick in enumerate(picks,1):
             output=work/f"highlight_{i:02d}.mp4"
+            # Reels/Shorts 9:16 canvas. Keep the complete original frame visible
+            # in front, and fill the portrait canvas with a blurred copy behind it.
+            vertical_filter = (
+                "[0:v]split=2[bg][fg];"
+                "[bg]scale=720:1280:force_original_aspect_ratio=increase,"
+                "crop=720:1280,boxblur=20:10,setsar=1[background];"
+                "[fg]scale=720:1280:force_original_aspect_ratio=decrease,"
+                "setsar=1[foreground];"
+                "[background][foreground]overlay=(W-w)/2:(H-h)/2,"
+                "setsar=1,format=yuv420p[v]"
+            )
             subprocess.run(["ffmpeg","-y","-ss",f"{pick['start']:.3f}","-i",str(source),
-                "-t",f"{pick['end']-pick['start']:.3f}","-vf","scale='min(720,iw)':-2",
-                "-c:v","libx264","-preset","veryfast","-crf","28","-c:a","aac","-b:a","96k",
-                "-movflags","+faststart",str(output)],check=True,stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,text=True,timeout=1800)
+                "-t",f"{pick['end']-pick['start']:.3f}","-filter_complex",vertical_filter,
+                "-map","[v]","-map","0:a?","-c:v","libx264","-preset","veryfast","-crf","28",
+                "-c:a","aac","-b:a","96k","-movflags","+faststart",str(output)],
+                check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=1800)
             clips.append({"file":output.name,"name":f"Highlight {i:02d}",
                           "start":round(pick["start"],2),"end":round(pick["end"],2),
                           "transcript":pick["text"][:500]})
