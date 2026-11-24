@@ -28,7 +28,7 @@ MODEL_NAME = os.environ.get("WHISPER_MODEL", "base")
 jobs, upload_locks = {}, {}
 lock, model_lock = threading.RLock(), threading.Lock()
 whisper_model = None
-# Restore small job records so a PM2 restart does not lose delivery retry state.
+# Restore small job records so completed clips remain available after a PM2 restart.
 for saved in JOBS.glob("*.json"):
     try:
         item = json.loads(saved.read_text(encoding="utf-8"))
