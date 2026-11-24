@@ -1,9 +1,9 @@
 from __future__ import annotations
 import json, logging, os, re, secrets, shutil, subprocess, threading, time, uuid
 from pathlib import Path
-import requests, whisper
+import whisper
 from dotenv import load_dotenv
-from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for, send_file
 from werkzeug.security import check_password_hash
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -24,11 +24,7 @@ app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   MAX_CONTENT_LENGTH=MAX_UPLOAD)
 CHUNK, MAX_CLIPS, CLIP_SECONDS = 8 * 1024**2, 10, 90
 MAX_DURATION = int(os.environ.get("MAX_VIDEO_SECONDS", "10800"))
-BRIDGE = os.environ.get("WHATSAPP_BRIDGE_URL", "http://127.0.0.1:8766").rstrip("/")
-PHONE_NUMBER = re.sub(r"\D", "", os.environ.get("WHATSAPP_PHONE_NUMBER", ""))
-CHAT_ID = os.environ.get("WHATSAPP_CHAT_ID", "").strip() or (f"{PHONE_NUMBER}@s.whatsapp.net" if PHONE_NUMBER else "")
 MODEL_NAME = os.environ.get("WHISPER_MODEL", "base")
-whatsapp_process = None
 jobs, upload_locks = {}, {}
 lock, model_lock = threading.RLock(), threading.Lock()
 whisper_model = None
@@ -99,50 +95,6 @@ def choose_highlights(segments, duration, requested):
     if not chosen: raise RuntimeError("Could not identify suitable spoken highlight moments.")
     return sorted(chosen,key=lambda x:x["start"])
 
-def send_clip(path, caption):
-    if not CHAT_ID: raise RuntimeError("Set WHATSAPP_PHONE_NUMBER in the app environment before processing.")
-    if not path.is_file(): raise FileNotFoundError(f"Missing clip: {path.name}")
-    payload={"chatId":CHAT_ID,"filePath":str(path.resolve()),"mediaType":"video",
-             "caption":caption[:900],"fileName":path.name}
-    response=requests.post(f"{BRIDGE}/send-media",json=payload,timeout=(10,300))
-    try: result=response.json()
-    except ValueError: result={"error":response.text[:250]}
-    if response.status_code >= 400 or result.get("success") is not True:
-        raise RuntimeError(f"WhatsApp bridge rejected {path.name}: {result.get('error',response.status_code)}")
-    return result
-
-def deliver(job_id, work):
-    clips=jobs[job_id].get("clips",[])
-    sent=set(jobs[job_id].get("sent_indices",[]))
-    write_job(job_id,status="sending",progress=90,message=f"Sending clips to WhatsApp ({len(sent)}/{len(clips)})…")
-    for i,clip in enumerate(clips):
-        if i in sent: continue
-        caption=f"Highlight {i+1}/{len(clips)} · {clip['start']}s–{clip['end']}s\n{clip.get('transcript','')[:500]}"
-        error=None
-        for attempt in range(1,4):
-            try:
-                send_clip(work/clip["file"],caption)
-                sent.add(i)
-                write_job(job_id,sent_indices=sorted(sent),progress=90+int(9*len(sent)/max(1,len(clips))),
-                          message=f"WhatsApp accepted clip {len(sent)} of {len(clips)}…")
-                error=None
-                break
-            except Exception as exc:
-                error=exc
-                log.warning("WhatsApp attempt %s failed for job %s clip %s: %s",attempt,job_id,i+1,exc)
-                if attempt < 3: time.sleep(3*attempt)
-        if error is not None:
-            write_job(job_id,status="delivery_failed",
-                      message=f"WhatsApp could not accept clip {i+1}. Your original and clips are safe on the server. Tap Retry WhatsApp delivery.")
-            return False
-    # Baileys has accepted every clip; now clear the complete video workspace.
-    shutil.rmtree(work,ignore_errors=True)
-    for path in INCOMING.glob(job_id+".*"): path.unlink(missing_ok=True)
-    write_job(job_id,status="delivered",progress=100,
-              message=f"All {len(clips)} clips sent to WhatsApp. Original and clip files deleted from the server.",
-              storage_cleared=True)
-    return True
-
 def process_video(job_id, source_path, requested):
     work=JOBS/job_id
     work.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -172,9 +124,8 @@ def process_video(job_id, source_path, requested):
                           "start":round(pick["start"],2),"end":round(pick["end"],2),
                           "transcript":pick["text"][:500]})
             write_job(job_id,progress=55+int(30*i/len(picks)),message=f"Created clip {i} of {len(picks)}…")
-        write_job(job_id,clips=clips,status="clips_ready",progress=88,
-                  message=f"Created {len(clips)} clips. Sending to WhatsApp…")
-        deliver(job_id,work)
+        write_job(job_id,clips=clips,status="ready",progress=100,
+                  message=f"Your {len(clips)} clips are ready. Preview or download them, then choose DONE & DELETE when finished.")
     except Exception as exc:
         log.exception("Processing failed for job %s",job_id)
         write_job(job_id,status="failed",progress=0,message=str(exc)[:500],storage_cleared=False)
@@ -215,23 +166,7 @@ def index():
 
 @app.get("/health")
 def health():
-    return jsonify(status="ok",app="private-video-highlights",
-                   whatsapp_configured=bool(CHAT_ID))
-
-@app.get("/api/whatsapp/status")
-def whatsapp_status():
-    require_login()
-    try:
-        response = requests.get(f"{BRIDGE}/status", timeout=5)
-        response.raise_for_status()
-        data = response.json()
-        data["recipient_configured"] = bool(CHAT_ID)
-        return jsonify(data)
-    except Exception as exc:
-        log.warning("WhatsApp status unavailable: %s", exc)
-        return jsonify(connected=False, qr_data_url=None,
-                       recipient_configured=bool(CHAT_ID),
-                       error="WhatsApp session is starting. Refresh in a moment."), 503
+    return jsonify(status="ok",app="private-browser-video-clipper")
 
 @app.post("/api/upload/init")
 def init_upload():
@@ -300,8 +235,8 @@ def complete_upload(upload_id):
         video.replace(source); shutil.rmtree(folder,ignore_errors=True); upload_locks.pop(upload_id,None)
     except (OSError,json.JSONDecodeError): abort(404)
     source.chmod(0o600)
-    record={"id":job_id,"pipeline":"whatsapp-highlights","status":"queued","progress":1,"message":"Upload complete. Starting analysis…",
-            "created":int(time.time()),"clips":[],"sent_indices":[],"requested_clips":meta["count"],"storage_cleared":False}
+    record={"id":job_id,"pipeline":"browser-highlights","status":"queued","progress":1,"message":"Upload complete. Starting analysis…",
+            "created":int(time.time()),"clips":[],"requested_clips":meta["count"],"storage_cleared":False}
     with lock:
         jobs[job_id]=record
         (JOBS/f"{job_id}.json").write_text(json.dumps(record),encoding="utf-8")
@@ -321,44 +256,48 @@ def job_status(job_id):
             item=json.loads(path.read_text(encoding="utf-8"))
     return jsonify({k:v for k,v in item.items() if k not in {"sent_indices","source_path"}})
 
-@app.post("/api/jobs/<job_id>/retry")
-def retry_delivery(job_id):
+@app.get("/api/jobs/<job_id>/clips/<int:index>")
+def get_clip(job_id,index):
+    require_login()
+    if not re.fullmatch(r"[a-f0-9]{32}",job_id): abort(404)
+    with lock:
+        item=jobs.get(job_id)
+        if not item or item.get("pipeline") != "browser-highlights" or item.get("status") != "ready": abort(404)
+        clips=item.get("clips",[])
+        if index<0 or index>=len(clips): abort(404)
+        filename=clips[index].get("file","")
+    if not filename or Path(filename).name != filename or not filename.endswith(".mp4"): abort(404)
+    path=JOBS/job_id/filename
+    if not path.is_file(): abort(404)
+    return send_file(path,mimetype="video/mp4",as_attachment=request.args.get("download")=="1",
+                     download_name=f"clip_{index+1:02d}.mp4",conditional=True)
+
+@app.post("/api/jobs/<job_id>/delete")
+def delete_job_files(job_id):
     require_login()
     if request.headers.get("X-CSRF-Token") != session.get("csrf"): abort(403)
     if not re.fullmatch(r"[a-f0-9]{32}",job_id): abort(404)
     with lock:
-        record=jobs.get(job_id)
-        if not record or record.get("status")!="delivery_failed":
-            return jsonify(error="This job has no pending WhatsApp delivery."),409
+        item=jobs.get(job_id)
+        if not item or item.get("pipeline") != "browser-highlights": abort(404)
+        if item.get("status") not in {"ready","failed"}:
+            return jsonify(error="This job cannot be deleted while processing. Wait until it finishes."),409
         work=JOBS/job_id
-        if not work.is_dir(): return jsonify(error="Retained video files are missing. Re-upload the video."),410
-        record["status"]="sending"
-    threading.Thread(target=deliver,args=(job_id,work),daemon=True).start()
-    return jsonify(message="Retrying unsent clips."),202
+        if work.exists(): shutil.rmtree(work)
+        for source in INCOMING.glob(job_id+".*"):
+            if source.is_file(): source.unlink()
+        item.update(status="deleted",storage_cleared=True,progress=100,
+                    message="Original video, clips and temporary files for this job have been deleted.")
+        tmp=JOBS/f".{job_id}.json.tmp"
+        tmp.write_text(json.dumps(item,ensure_ascii=False),encoding="utf-8")
+        tmp.replace(JOBS/f"{job_id}.json")
+    return jsonify(message=item["message"],status="deleted")
 
 @app.get("/api/jobs")
 def list_jobs():
     require_login()
     with lock:
-        return jsonify(jobs=[{k:v for k,v in item.items() if k not in {"sent_indices","source_path"}} for item in jobs.values()])
-
-def run_whatsapp_bridge():
-    global whatsapp_process
-    node = shutil.which("node")
-    if not node:
-        raise SystemExit("Node.js is required for the dedicated WhatsApp session.")
-    env = os.environ.copy()
-    env.setdefault("WHATSAPP_AUTH_DIR", str(DATA / "whatsapp-auth"))
-    whatsapp_process = subprocess.Popen([node, str(BASE / "whatsapp.js")],
-        cwd=str(BASE), env=env, stdin=subprocess.DEVNULL)
-    def watch():
-        while True:
-            code = whatsapp_process.poll()
-            if code is not None:
-                log.error("Dedicated WhatsApp session exited (%s); restarting app under PM2.", code)
-                os._exit(1)
-            time.sleep(5)
-    threading.Thread(target=watch, name="whatsapp-watch", daemon=True).start()
+        return jsonify(jobs=[{k:v for k,v in item.items() if k not in {"sent_indices","source_path"}} for item in jobs.values() if item.get("pipeline") == "browser-highlights"])
 
 def run_cloudflare_tunnel():
     binary=shutil.which("cloudflared")
@@ -376,6 +315,5 @@ def run_cloudflare_tunnel():
 
 if __name__=="__main__":
     if not PASSWORD and not PASSWORD_HASH: raise SystemExit("Set APP_PASSWORD or APP_PASSWORD_HASH before starting.")
-    run_whatsapp_bridge()
     run_cloudflare_tunnel()
     app.run(host="127.0.0.1",port=int(os.environ.get("PORT","8765")),debug=False,use_reloader=False,threaded=True)
