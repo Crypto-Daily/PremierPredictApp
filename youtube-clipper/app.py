@@ -32,11 +32,7 @@ whisper_model = None
 for saved in JOBS.glob("*.json"):
     try:
         item = json.loads(saved.read_text(encoding="utf-8"))
-        if item.get("pipeline") == "whatsapp-highlights" and item.get("id"):
-            if item.get("status") == "sending":
-                item["status"] = "delivery_failed"
-                item["message"] = "The app restarted during WhatsApp delivery. Retry to send any clips not yet accepted."
-                saved.write_text(json.dumps(item), encoding="utf-8")
+        if item.get("pipeline") == "browser-highlights" and item.get("id"):
             jobs[item["id"]] = item
     except (OSError, json.JSONDecodeError):
         log.warning("Skipping unreadable job record: %s", saved.name)
@@ -129,7 +125,7 @@ def process_video(job_id, source_path, requested):
     except Exception as exc:
         log.exception("Processing failed for job %s",job_id)
         write_job(job_id,status="failed",progress=0,message=str(exc)[:500],storage_cleared=False)
-        # Keep source and any rendered clips if processing or delivery cannot finish.
+        # Keep source and any rendered clips if processing cannot finish.
 
 @app.after_request
 def security_headers(response):
