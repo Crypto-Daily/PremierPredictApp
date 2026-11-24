@@ -100,7 +100,7 @@ function renderJob(job){
   section.className="job-result";
   const heading=document.createElement("div");
   heading.className="job-result-head";
-  heading.innerHTML='<div><strong>'+clips.length+' highlights ready</strong><p class="muted">'+escapeHtml(job.message)+'</p></div>';
+  heading.innerHTML='<div><strong>'+clips.length+' ranked Reels ready</strong><p class="muted">'+escapeHtml(job.message)+'</p></div>';
   const grid=document.createElement("div");
   grid.className="clip-grid";
   clips.forEach((clip,index)=>{
@@ -116,12 +116,44 @@ function renderJob(job){
     const timing=document.createElement("p");
     timing.className="muted"; timing.textContent=Number(clip.start).toFixed(1)+"s – "+Number(clip.end).toFixed(1)+"s";
     info.append(title,timing);
+    const quality=clip.quality;
+    if(quality){
+      const score=document.createElement("div");
+      score.className="quality-score";
+      const scoreTitle=document.createElement("strong");
+      scoreTitle.textContent="Quality score: "+quality.total+"/100";
+      score.append(scoreTitle);
+      const metrics=[
+        ["Opening",quality.opening],["Dialogue",quality.dialogue],
+        ["Gameplay",quality.gameplay],["Context",quality.context],["Ending",quality.ending]
+      ];
+      const metricList=document.createElement("div");
+      metricList.className="quality-metrics";
+      metrics.forEach(([label,value])=>{
+        const item=document.createElement("span");
+        item.textContent=label+" "+value;
+        metricList.append(item);
+      });
+      score.append(metricList);
+      const method=document.createElement("p");
+      method.className="muted quality-note";
+      method.textContent="Gameplay score uses sampled scene changes and audio intensity as proxies.";
+      score.append(method);
+      card.append(score);
+    }
+    const badges=document.createElement("div");
+    badges.className="clip-badges";
+    const reels=document.createElement("span");
+    reels.textContent="9:16 Reels";
+    const captions=document.createElement("span");
+    captions.textContent="Styled captions";
+    badges.append(reels,captions);
     const download=document.createElement("a");
     download.className="download-link";
     download.href="/api/jobs/"+encodeURIComponent(job.id)+"/clips/"+index+"?download=1";
     download.download="clip_"+String(index+1).padStart(2,"0")+".mp4";
     download.textContent="Download clip";
-    card.append(video,info,download);
+    card.append(video,badges,info,download);
     grid.append(card);
   });
   const actions=document.createElement("div");
@@ -141,7 +173,7 @@ function renderJob(job){
   actions.append(downloadAll,done);
   section.append(heading,grid,actions);
   $("results").prepend(section);
-  $("status").textContent="Your clips are ready. Preview and download them before deleting this job.";
+  $("status").textContent="Your ranked Reels are ready. Preview and download them before deleting this job.";
 }
 
 async function deleteJob(id,button){
