@@ -5,7 +5,7 @@ A private, single-user browser app for turning uploaded long-form videos into sh
 ## Workflow
 
 1. Sign in with the existing app password.
-2. Upload MP4, MOV, M4V, MKV or WebM (default maximum 1 GiB).
+2. Select one MP4, MOV, M4V, MKV or WebM (default maximum 1 GiB). The browser uploads it as 2 MiB pieces with four concurrent requests, automatic retries and resumable progress; the pieces are reassembled into the exact original file before processing.
 3. Choose up to 10 highlights.
 4. Whisper transcribes speech with word-level timestamps and selects up to 10 non-overlapping highlights, each no longer than 90 seconds.
 5. Each selected highlight receives a 0–100 quality score: strong opening (20%), interesting dialogue (20%), gameplay energy (25%), complete context (20%), and good ending (15%). Transcript cues assess dialogue and story structure; sampled FFmpeg scene changes and audio peak level act as lightweight gameplay-energy proxies. This is a heuristic ranking, not a human-level understanding of every visual event.
@@ -28,7 +28,7 @@ The existing Cloudflare Tunnel startup is retained. No WhatsApp phone number, QR
 
 ## Requirements and install
 
-Python dependencies are listed in requirements.txt. Node/WhatsApp bridge is not started by this version. FFmpeg (built with the `subtitles`/libass filter) and ffprobe must be installed. Whisper downloads its selected model on first use. Caption files are temporary job files and are removed by DONE & DELETE.
+Python dependencies are listed in requirements.txt. Node/WhatsApp bridge is not started by this version. Upload concurrency is set to four workers in the browser and can be adjusted in `static/app.js`. FFmpeg (built with the `subtitles`/libass filter) and ffprobe must be installed. Whisper downloads its selected model on first use. Caption files are temporary job files and are removed by DONE & DELETE.
 
 ## Storage and privacy
 
