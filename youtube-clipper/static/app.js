@@ -13,6 +13,8 @@ async function jsonResponse(response) {
   return response.json();
 }
 
+function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+
 $("clip-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const file = $("source-video").files[0];
@@ -21,30 +23,73 @@ $("clip-form").addEventListener("submit", async (event) => {
   $("job").classList.remove("hidden");
   $("bar").style.width = "1%";
   $("status").textContent = "Preparing secure upload…";
-  const chunkSize = 8 * 1024 * 1024;
-  const total = Math.ceil(file.size / chunkSize);
   try {
-    const initResponse = await fetch("/api/upload/init", {
-      method:"POST", headers:{"Content-Type":"application/json","X-CSRF-Token":csrfToken},
-      body:JSON.stringify({filename:file.name,size:file.size,chunks:total,count:$("count").value})
-    });
-    const init = await jsonResponse(initResponse);
-    if (!initResponse.ok) throw new Error(init.error || "Could not start upload.");
-    activeUploadId = init.upload_id;
+    let init, received = new Set();
+    const requestedCount = Number($("count").value);
+
+    // Reuse a paused upload when the same source file is still selected.
+    if (activeUploadId) {
+      try {
+        const statusResponse = await fetch("/api/upload/"+activeUploadId+"/status",{cache:"no-store"});
+        if (statusResponse.ok) {
+          const saved = await jsonResponse(statusResponse);
+          if (saved.size === file.size && saved.count === requestedCount) {
+            init = {upload_id:activeUploadId,chunk_size:saved.chunk_size,chunks:saved.chunks};
+            received = new Set(saved.received || []);
+          } else {
+            await fetch("/api/upload/"+activeUploadId+"/abort",{method:"POST",headers:{"X-CSRF-Token":csrfToken}});
+            activeUploadId = null;
+          }
+        } else {
+          activeUploadId = null;
+        }
+      } catch { activeUploadId = null; }
+    }
+
+    if (!init) {
+      const chunkSize = 2 * 1024 * 1024;
+      const total = Math.ceil(file.size / chunkSize);
+      const initResponse = await fetch("/api/upload/init", {
+        method:"POST", headers:{"Content-Type":"application/json","X-CSRF-Token":csrfToken},
+        body:JSON.stringify({filename:file.name,size:file.size,chunks:total,count:requestedCount})
+      });
+      const initData = await jsonResponse(initResponse);
+      if (!initResponse.ok) throw new Error(initData.error || "Could not start upload.");
+      init = initData;
+      activeUploadId = init.upload_id;
+    }
+
+    const chunkSize = Number(init.chunk_size) || 2 * 1024 * 1024;
+    const total = Number(init.chunks) || Math.ceil(file.size / chunkSize);
+    if (total !== Math.ceil(file.size / chunkSize)) throw new Error("This paused upload does not match the selected file. Choose the original file and retry.");
     for (let i=0;i<total;i++) {
+      if (received.has(i)) {
+        $("bar").style.width=Math.round(((i+1)/total)*20)+"%";
+        continue;
+      }
       const part=file.slice(i*chunkSize,Math.min(file.size,(i+1)*chunkSize));
       let success=false, lastError="Chunk upload failed.";
-      for(let attempt=0;attempt<3&&!success;attempt++){
+      for(let attempt=0;attempt<8&&!success;attempt++){
         try{
           const response=await fetch("/api/upload/"+init.upload_id+"/chunk/"+i,{
-            method:"PUT",headers:{"X-CSRF-Token":csrfToken,"Content-Type":"application/octet-stream"},body:part
+            method:"PUT",
+            headers:{"X-CSRF-Token":csrfToken,"Content-Type":"application/octet-stream"},
+            body:part,
+            signal:AbortSignal.timeout(120000)
           });
           const data=await jsonResponse(response);
-          if(!response.ok) throw new Error(data.error||lastError);
+          if(!response.ok) throw new Error(data.error||("HTTP "+response.status));
           success=true;
-        }catch(error){lastError=error.message;}
+        }catch(error){
+          lastError=error.name==="TimeoutError"?"Chunk request timed out.":error.message;
+          if(attempt<7){
+            const wait=Math.min(10000,1000*(2**attempt));
+            $("status").textContent="Connection interrupted at part "+(i+1)+". Retrying in "+Math.ceil(wait/1000)+"s…";
+            await sleep(wait);
+          }
+        }
       }
-      if(!success) throw new Error("Upload stopped at part "+(i+1)+"/"+total+": "+lastError);
+      if(!success) throw new Error("Upload paused at part "+(i+1)+"/"+total+": "+lastError+". Keep this file selected and tap Find my highlights again to resume.");
       $("bar").style.width=Math.round(((i+1)/total)*20)+"%";
       $("status").textContent="Uploading video: "+(i+1)+" of "+total+" parts…";
     }
@@ -57,10 +102,7 @@ $("clip-form").addEventListener("submit", async (event) => {
     activeJobId=result.id;
     poll(result.id);
   }catch(error){
-    if(activeUploadId){
-      try{await fetch("/api/upload/"+activeUploadId+"/abort",{method:"POST",headers:{"X-CSRF-Token":csrfToken}});}catch{}
-      activeUploadId=null;
-    }
+    // Do not abort: keep successfully received chunks so the user can resume.
     $("status").textContent=error.message;
     $("start").disabled=false;
   }
