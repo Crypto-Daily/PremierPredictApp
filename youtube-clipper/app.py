@@ -23,7 +23,7 @@ MAX_UPLOAD = int(os.environ.get("MAX_UPLOAD_BYTES", str(1024**3)))
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "1") == "1",
                   MAX_CONTENT_LENGTH=MAX_UPLOAD)
-CHUNK, MAX_CLIPS, CLIP_SECONDS = 8 * 1024**2, 10, 90
+CHUNK, MAX_CLIPS, CLIP_SECONDS = 2 * 1024**2, 10, 90
 MAX_DURATION = int(os.environ.get("MAX_VIDEO_SECONDS", "10800"))
 MODEL_NAME = os.environ.get("WHISPER_MODEL", "base")
 jobs, upload_locks = {}, {}
@@ -209,7 +209,7 @@ def init_upload():
         chunks=int(data.get("chunks",0))
     except (TypeError,ValueError): return jsonify(error="Invalid upload details."),400
     expected=(size+CHUNK-1)//CHUNK
-    if size<=0 or size>MAX_UPLOAD or chunks!=expected or chunks>256:
+    if size<=0 or size>MAX_UPLOAD or chunks!=expected or chunks>1024:
         return jsonify(error=f"Video must be between 1 byte and {MAX_UPLOAD//(1024**3)} GiB."),400
     upload_id=uuid.uuid4().hex
     folder=INCOMING/f"{upload_id}.upload"; folder.mkdir(mode=0o700)
@@ -218,6 +218,17 @@ def init_upload():
     (folder/"video.part").touch(mode=0o600)
     upload_locks[upload_id]=threading.Lock()
     return jsonify(upload_id=upload_id,chunk_size=CHUNK),201
+
+@app.get("/api/upload/<upload_id>/status")
+def upload_status(upload_id):
+    require_login()
+    if not re.fullmatch(r"[a-f0-9]{32}",upload_id): abort(404)
+    folder=INCOMING/f"{upload_id}.upload"
+    try:
+        meta=json.loads((folder/"meta.json").read_text(encoding="utf-8"))
+    except (OSError,json.JSONDecodeError): abort(404)
+    return jsonify(size=meta["size"],chunks=meta["chunks"],count=meta["count"],
+                   received=meta.get("received",[]),chunk_size=CHUNK)
 
 @app.put("/api/upload/<upload_id>/chunk/<int:index>")
 def upload_chunk(upload_id,index):
