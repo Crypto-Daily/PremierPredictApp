@@ -242,11 +242,21 @@ def upload_chunk(upload_id,index):
     raw=request.get_data(cache=False)
     expected=min(CHUNK,meta["size"]-index*CHUNK)
     if len(raw)!=expected: return jsonify(error=f"Chunk {index+1} has an unexpected size."),400
+    # Request bodies arrive concurrently; merge receipt metadata under the same per-upload lock.
+    # Re-read it inside the lock so simultaneous chunks cannot overwrite each other's receipt.
     with upload_locks.setdefault(upload_id,threading.Lock()):
+        meta_path=folder/"meta.json"
+        try:
+            current=json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError,json.JSONDecodeError):
+            abort(404)
         with (folder/"video.part").open("r+b") as target:
             target.seek(index*CHUNK); target.write(raw)
-        received=set(meta.get("received",[])); received.add(index); meta["received"]=sorted(received)
-        (folder/"meta.json").write_text(json.dumps(meta),encoding="utf-8")
+        received=set(current.get("received",[])); received.add(index)
+        current["received"]=sorted(received)
+        temp_meta=folder/"meta.json.tmp"
+        temp_meta.write_text(json.dumps(current),encoding="utf-8")
+        temp_meta.replace(meta_path)
     return jsonify(received=index),200
 
 @app.post("/api/upload/<upload_id>/abort")
