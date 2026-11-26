@@ -82,31 +82,44 @@ $("clip-form").addEventListener("submit", async (event) => {
         if (i >= total) return;
         if (completed.has(i)) continue;
         const part = file.slice(i * actualChunkSize, Math.min(file.size, (i + 1) * actualChunkSize));
-        let success = false, lastError = "Upload request failed.";
-        for (let attempt = 0; attempt < 8 && !success; attempt++) {
+        let success = false, lastError = "Upload request failed.", attempt = 0;
+        // Retry transient failures indefinitely while this upload page remains active.
+        // Backoff grows to 30 seconds, then stays there instead of giving up.
+        while (!success && !firstError) {
+          attempt++;
           try {
             const response = await fetch("/api/upload/"+init.upload_id+"/chunk/"+i, {
               method:"PUT",
               headers:{"X-CSRF-Token":csrfToken,"Content-Type":"application/octet-stream"},
               body:part,
-              signal:AbortSignal.timeout(120000)
+              signal:AbortSignal.timeout(600000)
             });
-            const data = await jsonResponse(response);
-            if (!response.ok) throw new Error(data.error || ("HTTP " + response.status));
-            success = true;
-          } catch (error) {
-            lastError = error.name === "TimeoutError" ? "Request timed out." : error.message;
-            if (attempt < 7) {
-              const wait = Math.min(10000, 1000 * (2 ** attempt));
-              $("status").textContent = "Connection hiccup — automatically retrying upload…";
-              await sleep(wait);
+            if (response.ok) {
+              await jsonResponse(response);
+              success = true;
+            } else {
+              const data = await jsonResponse(response);
+              lastError = data.error || ("HTTP " + response.status);
+              // Bad request/auth/permission/not-found errors cannot be repaired by retrying.
+              if (response.status >= 400 && response.status < 500 &&
+                  ![408, 425, 429].includes(response.status)) {
+                throw new Error(lastError);
+              }
+              throw new Error(lastError);
             }
+          } catch (error) {
+            if (error.message && /HTTP 4(00|01|03|04|09|10|11|12|13|14|15|16|17|18|19|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40|41|42|43|44|45|46|47|48|49|50|51|52|53|54|55|56|57|58|59|60|61|62|63|64|65|66|67|68|69|70|71|72|73|74|75|76|77|78|79|80|81|82|83|84|85|86|87|88|89|90|91|92|93|94|95|96|97|98|99)/.test(error.message) &&
+                !/HTTP (408|425|429)/.test(error.message)) {
+              firstError = "Upload cannot continue: " + lastError;
+              return;
+            }
+            lastError = error.name === "TimeoutError" ? "Request timed out." : error.message || lastError;
+            const wait = Math.min(30000, 1000 * (2 ** Math.min(attempt - 1, 5)));
+            $("status").textContent = "Upload connection interrupted — retrying chunk " + (i + 1) + " (attempt " + attempt + ")…";
+            await sleep(wait);
           }
         }
-        if (!success) {
-          firstError = "Upload paused at " + Math.round((completed.size / total) * 100) + "%. Keep this video selected and tap Find my highlights to resume. (" + lastError + ")";
-          return;
-        }
+        if (!success) return;
         completed.add(i);
         $("bar").style.width = Math.round((completed.size / total) * 20) + "%";
         $("status").textContent = "Uploading video… " + Math.round((completed.size / total) * 100) + "%";
