@@ -1,14 +1,13 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="csrf-token" content="{{ csrf }}"><title>Video Highlights</title><link rel="stylesheet" href="/static/style.css"></head>
-<body><header><h1>Video Highlights</h1><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary" type="submit">Sign out</button></form></header>
-<main><section class="panel"><h2>Connect your WhatsApp</h2><p class="muted">Pair a separate WhatsApp account for this Clipper. Scan this QR code from WhatsApp → Linked devices → Link a device.</p><div id="wa-status" class="muted" aria-live="polite">Checking WhatsApp connection…</div><img id="wa-qr" class="hidden" alt="WhatsApp linking QR code" style="max-width:260px;width:100%;height:auto"><p class="muted">Keep this page open while pairing. Your session is saved separately from Sophie.</p></section><section class="panel"><h2>Upload a video</h2><p class="muted">We find the strongest spoken moments, create up to 10 clips (maximum 90 seconds each), and send them directly to your WhatsApp.</p>
-<form id="clip-form"><label>Your video<input id="source-video" type="file" accept="video/mp4,video/quicktime,video/x-m4v,video/x-matroska,video/webm,.mp4,.mov,.m4v,.mkv,.webm" required></label>
-<p class="muted">MP4, MOV, M4V, MKV or WebM. Private single-user upload.</p>
-<label>Maximum number of clips<select id="count"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option selected>10</option></select></label>
-<p class="muted">Each clip is up to 90 seconds and compressed to reduce file size. Original aspect ratio is preserved.</p>
-<button id="start" type="submit">Find highlights and send to WhatsApp</button></form>
-<div id="job" class="job hidden"><div class="progress"><span id="bar"></span></div><p id="status" aria-live="polite">Waiting…</p></div></section>
-<section class="panel"><h2>Delivery</h2><div id="results"><p class="muted">After processing, your clips will arrive in your connected WhatsApp chat.</p></div></section>
-<p class="muted footnote">Privacy: original video, temporary files and generated clips are deleted from this server only after Baileys confirms every clip was accepted for sending. If WhatsApp sending fails, files are retained so delivery can be retried.</p>
+<meta name="csrf-token" content="{{ csrf }}"><title>AI Video Clipper</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><header><div><h1>AI Video Clipper</h1><p class="muted">Turn long videos into share-ready highlights.</p></div><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary" type="submit">Sign out</button></form></header>
+<main>
+<section class="panel"><div class="eyebrow">CREATE CLIPS</div><h2>Upload your video</h2><p class="muted">AI transcribes your video, selects up to 10 highlights (maximum 90 seconds each), adds bold highlighted captions, and ranks clips by opening, dialogue, gameplay, context and ending.</p>
+<form id="clip-form"><label class="upload-box"> <span class="upload-icon">↑</span><strong>Choose a video to upload</strong><span class="muted">MP4, MOV, M4V, MKV or WebM · Up to 1 GB</span><input id="source-video" type="file" accept="video/mp4,video/quicktime,video/x-m4v,video/x-matroska,video/webm,.mp4,.mov,.m4v,.mkv,.webm" required></label>
+<div class="settings-row"><label>Number of clips<select id="count"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option selected>10</option></select></label><p class="muted">9:16 Reels · blurred gameplay background · automatic styled captions · ranked highlights.</p></div>
+<button id="start" type="submit">Find my highlights</button></form>
+<div id="job" class="job hidden"><div class="progress"><span id="bar"></span></div><p id="status" aria-live="polite">Preparing…</p></div></section>
+<section class="panel"><div class="section-head"><div><div class="eyebrow">YOUR WORKSPACE</div><h2>Generated clips</h2></div><span id="job-count" class="muted"></span></div><div id="results"><p class="muted">Your finished clips will appear here for preview and download.</p></div></section>
+<p class="muted footnote">Your videos stay private to your signed-in account. Files remain available until you press DONE & DELETE. That action removes only the selected job's original video, clips and temporary files.</p>
 </main><script src="/static/app.js" defer></script></body></html>
