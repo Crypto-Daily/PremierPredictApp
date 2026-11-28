@@ -107,7 +107,7 @@ def process_video(job_id, source_path, requested):
             raise ValueError(f"Video duration must be between 1 second and {MAX_DURATION//3600} hours.")
 
         write_job(job_id,status="transcribing",progress=20,message="AI is transcribing speech and finding highlight moments…")
-        transcript=load_model().transcribe(str(source),fp16=False,verbose=False,word_timestamps=True)
+        transcript=load_model().transcribe(str(source),fp16=False,verbose=False,word_timestamps=False)
         segments=transcript.get("segments",[])
         picks=choose_highlights(segments,duration,requested)
 
